@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Playable Lab",
+    "slug": "playable-lab",
+    "orientation": "default",
+    "platforms": ["ios", "android"],
+    "plugins": [
+      "expo-camera",
+      "expo-screen-orientation"
+    ]
+  }
+}

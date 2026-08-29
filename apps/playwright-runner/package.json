@@ -1,0 +1,21 @@
+{
+  "name": "@playable-lab/playwright-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "install-browsers": "playwright install chromium"
+  },
+  "dependencies": {
+    "@playable-lab/device-catalog": "0.1.0",
+    "@playable-lab/input-mapper": "0.1.0",
+    "@playable-lab/orientation-guard": "0.1.0",
+    "@playable-lab/protocol": "0.1.0",
+    "playwright": "^1.50.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

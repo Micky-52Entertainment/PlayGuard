@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Sample Tap Target</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; background: #111827; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #hud { position: absolute; top: 16px; left: 16px; color: #e5e7eb; font-size: 14px; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="hud">Taps: 0</div>
+  <script>
+    (function () {
+      var canvas = document.getElementById("game");
+      var ctx = canvas.getContext("2d");
+      var taps = 0;
+      var target = { x: 0.5, y: 0.45, r: 0.08 };
+
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        draw();
+      }
+
+      function draw() {
+        ctx.fillStyle = "#111827";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#22c55e";
+        ctx.beginPath();
+        ctx.arc(target.x * canvas.width, target.y * canvas.height, target.r * canvas.width, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#f8fafc";
+        ctx.font = "16px sans-serif";
+        ctx.fillText("Tap the circle", 16, canvas.height - 24);
+      }
+
+      function hit(nx, ny) {
+        var dx = nx - target.x;
+        var dy = ny - target.y;
+        if (dx * dx + dy * dy <= target.r * target.r) {
+          taps += 1;
+          document.getElementById("hud").textContent = "Taps: " + taps;
+          target.x = 0.2 + Math.random() * 0.6;
+          target.y = 0.2 + Math.random() * 0.6;
+          draw();
+        }
+      }
+
+      function onPointer(e) {
+        var rect = canvas.getBoundingClientRect();
+        hit((e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
+      }
+
+      canvas.addEventListener("pointerdown", onPointer);
+      canvas.addEventListener("mousedown", onPointer);
+      canvas.addEventListener("touchstart", function (e) {
+        if (!e.changedTouches || !e.changedTouches[0]) {
+          return;
+        }
+        onPointer(e.changedTouches[0]);
+      }, { passive: true });
+
+      window.addEventListener("resize", resize);
+      resize();
+    })();
+  </script>
+</body>
+</html>
