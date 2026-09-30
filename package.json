@@ -8,10 +8,16 @@
     "packages/*"
   ],
   "scripts": {
+    "start": "node scripts/start.mjs",
     "hub": "npm run start -w @playable-lab/hub",
     "console": "npm run dev -w @playable-lab/lab-console",
     "replay": "npm run start -w @playable-lab/playwright-runner --",
-    "test": "tsx --test packages/input-mapper/src/index.test.ts packages/orientation-guard/src/index.test.ts"
+    "check": "npm run start -w @playable-lab/playwright-runner --",
+    "autoplay": "npm run start -w @playable-lab/playwright-runner -- --autoplay",
+    "test": "tsx --test \"packages/*/src/*.test.ts\" \"apps/*/src/*.test.ts\"",
+    "test:site": "npm run build -w @playable-lab/lab-console && tsx --test tests/site.e2e.ts",
+    "verify": "npm test && npm run test:site",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "tsx": "^4.19.3",

@@ -4,6 +4,9 @@ build/
 .DS_Store
 traces/*.json
 traces/*.png
+reports/
 playables/**
 !playables/.gitkeep
 *.log
+batches/
+.playable-lab/

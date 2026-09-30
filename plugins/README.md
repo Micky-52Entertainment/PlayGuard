@@ -11,4 +11,7 @@ hooks from `@playable-lab/plugin-sdk` when you register an implementation.
 | `performance/` | FPS, long tasks, memory while replaying |
 | `network/` | Offline / 3G / blocked CDN while replaying |
 
+Load, blank-screen, CTA and network checks already run on every replay
+(`packages/checks`); the replay report also carries an FPS reading.
+
 Do not put live/record logic here. Plugins observe traces; they do not own input.

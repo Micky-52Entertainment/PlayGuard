@@ -1,0 +1,38 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hub",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "hub"
+      ],
+      "port": 8787
+    },
+    {
+      "name": "console",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "console"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "console-5183",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "exec",
+        "-w",
+        "@playable-lab/lab-console",
+        "--",
+        "vite",
+        "--port",
+        "5183",
+        "--strictPort"
+      ],
+      "port": 5183
+    }
+  ]
+}

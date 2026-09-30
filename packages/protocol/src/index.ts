@@ -7,20 +7,44 @@ export type PointerKind = "touch" | "mouse" | "pen";
 export type PointerPhase = "down" | "move" | "up" | "cancel" | "wheel" | "key";
 export type InputType = "pointer" | "wheel" | "key" | "gesture";
 
+/**
+ * Where a touch landed in the playable's own scene: a point in the local space
+ * of the object group under the finger. Another screen resolves it through its
+ * copy of that group, so the touch follows the layout instead of the pixels.
+ */
+export interface TapAnchor {
+  engine: "pixi" | "unity";
+  /**
+   * Pixi: child indices from the stage down to the group. Unity: the control's
+   * name path, or "" for a point in world space.
+   */
+  path: string;
+  x: number;
+  y: number;
+  /** Unity world points only: depth of the gameplay plane. */
+  z?: number;
+}
+
 export interface PointerContact {
   pointerId: number;
   nx: number;
   ny: number;
+  anchor?: TapAnchor;
   pressure: number;
 }
 
 export interface PointerSample {
+  /** Wall clock of the source device (ms since epoch). */
   t: number;
+  /** Ms since the playable's window `load` on the source. Replay schedules on this. */
+  rt?: number;
   kind: PointerKind;
   phase: PointerPhase;
   pointerId: number;
   nx: number;
   ny: number;
+  /** Set when the engine's scene was reachable on the source; preferred over nx/ny. */
+  anchor?: TapAnchor;
   pressure: number;
   type?: InputType;
   isPrimary?: boolean;
@@ -47,6 +71,29 @@ export interface PointerSample {
     | "rotate"
     | "drag";
 }
+export type AdEventKind = "cta" | "lifecycle";
+
+/** A call the playable made into an ad-network API (mocked by the lab). */
+export interface AdEvent {
+  t: number;
+  rt: number;
+  kind: AdEventKind;
+  /** e.g. "mraid.open", "FbPlayableAd.onCTAClick", "install", "gameReady". */
+  api: string;
+  detail?: string;
+}
+
+/** Frame rate of the playable on the source device over roughly one second. */
+export interface PerfSample {
+  /** Ms since the playable page started; the window this sample closes. */
+  at: number;
+  /** Ms since `load`, 0 while still loading. */
+  rt: number;
+  fps: number;
+  /** Longest single frame in the window, ms. */
+  worstFrameMs: number;
+}
+
 export type ClientRole = "mobile" | "console" | "runner";
 export type SessionMode = "live" | "replay";
 export type FitMode = "stretch" | "contain";
@@ -71,16 +118,6 @@ export interface ViewportSnapshot {
   orientation: Orientation;
   contentRect: Rect;
   fit: FitMode;
-}
-
-export interface PointerSample {
-  t: number;
-  kind: PointerKind;
-  phase: PointerPhase;
-  pointerId: number;
-  nx: number;
-  ny: number;
-  pressure: number;
 }
 
 export interface PlayableRef {
@@ -133,7 +170,16 @@ export interface SessionTrace {
   sourceViewport: ViewportSnapshot;
   startedAt: number;
   endedAt?: number;
+  /** Screens the operator mirrored while recording; the replay checks the same ones. */
+  deviceIds?: string[];
+  /** Who recorded it: the name the operator gave the console. */
+  by?: string;
+  /** Seed every instance of the playable gets for Math.random in this session. */
+  seed?: number;
   events: PointerSample[];
+  adEvents?: AdEvent[];
+  /** Frame rate on the source device, from page start to the end of the session. */
+  perf?: PerfSample[];
   abort?: SessionAbort;
 }
 
@@ -166,6 +212,30 @@ export type HubInbound =
       cssHeight: number;
     }
   | {
+      type: "ad_event";
+      sessionId: string;
+      event: AdEvent;
+    }
+  | {
+      type: "perf";
+      sessionId: string;
+      sample: PerfSample;
+    }
+  | {
+      /** The phone began loading the playable: mirrors start loading with it. */
+      type: "source_started";
+      sessionId: string;
+      cssWidth: number;
+      cssHeight: number;
+    }
+  | {
+      /** The playable finished loading on the phone: the recording starts here. */
+      type: "source_loaded";
+      sessionId: string;
+      cssWidth: number;
+      cssHeight: number;
+    }
+  | {
       type: "end_session";
       sessionId: string;
     };
@@ -174,6 +244,16 @@ export type HubOutbound =
   | { type: "hello_ok"; clientId: string }
   | { type: "session_started"; sessionId: string; orientationLock: Orientation }
   | { type: "input"; sessionId: string; event: PointerSample }
+  | { type: "ad_event"; sessionId: string; event: AdEvent }
+  | { type: "source_started"; sessionId: string; cssWidth: number; cssHeight: number }
+  | { type: "source_loaded"; sessionId: string; cssWidth: number; cssHeight: number }
+  /** The phone opened the session page; it may not have tapped Start yet. */
+  | { type: "source_connected"; sessionId: string }
+  /** The phone's connection dropped; after `graceMs` without it the session aborts (0: nothing to abort yet). */
+  | { type: "source_lost"; sessionId: string; graceMs: number }
+  | { type: "perf"; sessionId: string; sample: PerfSample }
+  /** The next recording (the other orientation) is ready: the phone opens `path` on its own. */
+  | { type: "source_next"; sessionId: string; nextSessionId: string; path: string; orientationLock: Orientation }
   | { type: "session_aborted"; sessionId: string; abort: SessionAbort }
   | { type: "session_ended"; sessionId: string; trace: SessionTrace }
   | { type: "error"; message: string };
