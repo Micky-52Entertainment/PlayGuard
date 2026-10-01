@@ -47,15 +47,18 @@ const NAV: Array<{ id: View; icon: JSX.Element }> = [
       </svg>
     ),
   },
-  {
-    id: "traces",
-    icon: (
-      <svg viewBox="0 0 20 20" aria-hidden="true">
-        <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="1.6" />
-        <circle cx="10" cy="10" r="3.2" fill="currentColor" />
-      </svg>
-    ),
-  },
+  // Recordings are turned off: the wizard records, checks and keeps them by itself,
+  // and a separate list of raw recordings only confused the team. To bring it
+  // back, uncomment this entry (the view below and TracesView are kept).
+  // {
+  //   id: "traces",
+  //   icon: (
+  //     <svg viewBox="0 0 20 20" aria-hidden="true">
+  //       <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="1.6" />
+  //       <circle cx="10" cy="10" r="3.2" fill="currentColor" />
+  //     </svg>
+  //   ),
+  // },
   {
     id: "reports",
     icon: (
@@ -89,7 +92,11 @@ export const App = () => {
   const { t, lang, setLang } = useI18n();
   const langIndex = LANGS.findIndex((item) => item.id === lang);
   const nextLang = LANGS[(langIndex + 1) % LANGS.length];
-  const [view, setView] = useState<View>("check");
+  const [view, setView] = useState<View>(() => {
+    // The app's shortcuts (right click on its icon) open a view directly.
+    const asked = new URLSearchParams(window.location.search).get("view");
+    return asked === "reports" || asked === "builds" || asked === "settings" || asked === "help" ? asked : "check";
+  });
   const [flow, setFlow] = useState<Flow>(loadFlow);
   const [reportDir, setReportDir] = useState<string | null>(null);
   const [batchId, setBatchId] = useState<string | null>(null);

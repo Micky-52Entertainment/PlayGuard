@@ -9,6 +9,8 @@ import { Hint } from "./Hint";
 import { ConfirmDialog } from "./Dialogs";
 import { DEVICE_CATALOG, FORMAT_SET, platformOf } from "@playable-lab/device-catalog";
 import { LANGS, useI18n } from "./i18n";
+import { install, installState, onInstallChange } from "./install";
+import type { InstallState } from "./install";
 import { chime, finishSoundOn, mascotHidden, setFinishSound, setMascotHidden } from "./mascotBus";
 import { getName, setName } from "./identity";
 import { applyTheme, getTheme } from "./theme";
@@ -220,6 +222,35 @@ const LanguagesBlock = ({
       )}
       <p className="hint">{t("scope.languages.hint", { n: languages.chosen.length + 1 })}</p>
     </>
+  );
+};
+
+/** PlayGuard as an app on this computer: its own window, its own icon in the Dock or the taskbar. */
+const AppSection = () => {
+  const { t } = useI18n();
+  const [state, setState] = useState<InstallState>(installState);
+  useEffect(() => onInstallChange(() => setState(installState())), []);
+  const safari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+  return (
+    <section className="app-install">
+      <h2>{t("app.install.title")}</h2>
+      <div className="app-install-row">
+        <img src="/icon-192.png" alt="" width={56} height={56} />
+        <div>
+          {state === "installed" && <p className="hint">✓ {t("app.install.done")}</p>}
+          {state === "ready" && (
+            <>
+              <p className="hint">{t("app.install.text")}</p>
+              <button className="primary" onClick={() => void install().then(() => setState(installState()))}>
+                {t("app.install.go")}
+              </button>
+            </>
+          )}
+          {state === "manual" && <p className="hint">{safari ? t("app.install.safari") : t("app.install.manual")}</p>}
+          {state === "insecure" && <p className="hint">{t("app.install.insecure")}</p>}
+        </div>
+      </div>
+    </section>
   );
 };
 
@@ -524,6 +555,7 @@ export const SettingsView = ({ settings, onSettings, health, onInstall, onTour, 
 
           <YouSection />
 
+          <AppSection />
           <ThemeSection />
           <MascotSection />
 

@@ -78,8 +78,8 @@ The console is a four-step wizard (**Check**):
 4. **Result** — one verdict (ready / needs a look / not ready) with the report
    under it. **Download as one file** packs the report into a zip to send on.
 
-**Builds**, **Recordings** and **Reports** keep the full tables for whoever
-wants them. **Settings** holds the language (Russian / English / French, also the
+**Builds** and **Reports** keep the full tables for whoever wants them
+(the separate Recordings tab is turned off: the wizard keeps recordings by itself). **Settings** holds the language (Russian / English / French, also the
 language of new reports' summary), the AI tester's API keys, and what is
 installed on this computer, with one button to install the browser the checks
 and the report videos need. Keys are written to `.playable-lab/settings.json`

@@ -227,7 +227,8 @@ describe("PlayGuard site", { timeout: 600000 }, () => {
     const { context, page } = await teammate({ viewport: { width: 375, height: 812 } });
     await page.goto(HUB);
     await dismissSetup(page);
-    for (const view of ["Check", "Builds", "Recordings", "Reports", "Help", "Settings"]) {
+    assert.equal(await page.getByRole("button", { name: "Recordings", exact: true }).count(), 0, "the Recordings tab is turned off");
+    for (const view of ["Check", "Builds", "Reports", "Help", "Settings"]) {
       const tab = page.getByRole("button", { name: view, exact: true });
       if (await tab.isVisible().catch(() => false)) {
         await tab.click();

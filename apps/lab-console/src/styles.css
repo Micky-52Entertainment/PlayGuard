@@ -2146,3 +2146,8 @@ button.share-item { text-align: left; font: inherit; cursor: pointer; }
 }
 .depth { width: 100%; box-sizing: border-box; }
 .depth-option { min-width: 0; white-space: normal; }
+.app-install-row { display: flex; align-items: center; gap: 14px; }
+.app-install-row img { border-radius: 14px; box-shadow: var(--shadow-soft); flex: none; }
+.app-install-row .hint { margin: 0 0 8px; }
+/* In its own window the app has no browser bar: give the top a little room. */
+@media (display-mode: standalone) { .rail { padding-top: max(10px, env(titlebar-area-height, 0px)); } }
