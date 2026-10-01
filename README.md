@@ -4,6 +4,8 @@
 
 Someone plays the playable once: on a phone, with the mouse, or an AI does it. PlayGuard replays that playthrough on screens of every shape and watches for errors, sound, the install button and each ad network's rules. In the end it gives one clear verdict: **Ready**, **Needs a look** or **Not ready**.
 
+[![PlayGuard in 2.5 minutes — watch the video](docs/images/video-poster.jpg)](video/PlayGuard_v7.mp4)
+
 ![Result of a check](docs/images/3-result.png)
 
 > How to start and use it, in short: [КАК-НАЧАТЬ.md](КАК-НАЧАТЬ.md) (Russian).
