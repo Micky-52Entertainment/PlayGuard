@@ -388,7 +388,7 @@ export const App = () => {
     }
     const traceIds = [...flow.traceIds, traceId];
     const next = flow.pass + 1;
-    mascotSay({ pose: "ok", text: t(next < flow.plan.length ? "mascot.saved.next" : "mascot.saved"), ms: 5000 });
+    mascotSay({ pose: "ok", text: t(next < flow.plan.length ? (flow.mode === "pc" ? "mascot.saved.nextPc" : "mascot.saved.next") : "mascot.saved"), ms: 5000 });
     if (next < flow.plan.length && flow.playableId) {
       setRecordRequest({
         playableId: flow.playableId,

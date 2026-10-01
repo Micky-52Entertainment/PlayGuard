@@ -1,387 +1,184 @@
-# Playable Testing Lab
+# PlayGuard
 
-Lab for playable ads: one recorded gameplay on a phone, remapped onto many
-screen sizes, then replayed with Playwright. Works with Luna Playworks,
-Cocos Creator web-mobile, and clear JS / vanilla HTML5.
+**PlayGuard проверяет плееблы — интерактивную мини-игру внутри рекламы — до того, как они уйдут в рекламную сеть.**
 
-Previous Audit Pro iframes live in `legacy/audit-pro/`.
+Плеебл один раз проходят на телефоне (или мышью, или это делает AI). Программа повторяет это прохождение на десятках экранов разной формы, следит за ошибками, звуком, кнопкой установки и правилами каждой рекламной сети, а в конце выдаёт один понятный итог: **«Готов»**, **«Нужно посмотреть»** или **«Не готов»**.
 
-## How a session runs
+> Как запустить и чем пользоваться — коротко в [КАК-НАЧАТЬ.md](КАК-НАЧАТЬ.md).
+> Техническое описание для разработчиков — в [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
-1. Operator picks a **test chain step**. Each step is one group and **one**
-   orientation: Android portrait, then Android landscape, then iOS, then
-   tablets. Portrait and landscape never share a session.
-2. Lab Console starts a session. The Hub prints a QR (Unity Ad Tester style).
-3. Phone scans the QR (Camera / the Expo app). The playable opens full-screen.
-4. Pointer events leave the phone as **normalized** `nx, ny` (0..1 of the
-   playable content rect). The Hub fans them to every selected PC viewport.
-   Each iframe has that device's CSS size, so the same tap lands on a
-   different pixel on iPhone SE and iPad Pro.
-5. If the phone rotates, or portrait and landscape both appear in one
-   session, the Hub **aborts** and tells you to replay that step.
-6. End session writes `traces/<sessionId>.json`. Playwright replays the
-   trace on other viewports without the phone, runs the checks on every
-   screen and writes an HTML report.
+---
 
-```
-Phone (source)
-    │  WebSocket: PointerSample { nx, ny, t, phase }
-    ▼
-Hub  ── fan-out ──► Lab Console screens (slave iframes, per-device size)
-    │
-    └── SessionTrace.json ──► Playwright Chromium (device matrix)
-                                  └── checks ──► reports/<run>/index.html
-```
+## Зачем это нужно
 
-## Packages
+Плеебл, который отлично работает на телефоне разработчика, может:
 
-| Package | Role |
+- обрезаться на длинном Android или на квадратном планшете;
+- сломаться при повороте экрана;
+- не открыть магазин по кнопке «Установить» — или открыть не то приложение;
+- превысить лимит размера файла, который ставит сеть;
+- обращаться в интернет, что многие сети запрещают;
+- играть звук до первого касания;
+- работать в Chrome, но падать в Safari на iPhone.
+
+Сеть такой плеебл отклонит, а если пропустит — реклама будет плохо работать и терять деньги. Раньше всё это проверяли руками на нескольких телефонах. PlayGuard делает то же самое на всех формах экранов сразу, одинаково каждый раз, и записывает результат так, чтобы его понял любой человек, а не только разработчик.
+
+## Что делает программа — по шагам
+
+Работа идёт как мастер из четырёх шагов.
+
+### 1. Загрузка
+
+Перетащите в окно программы:
+
+- один HTML-файл плеебла;
+- ZIP-архив со сборками под разные сети;
+- несколько файлов или целую папку.
+
+Программа сама понимает, на чём сделан плеебл (Luna Playworks, Cocos Creator, обычный HTML5/JavaScript), и по имени файла или по коду определяет, для какой рекламной сети сборка. В разделе «Проверялось раньше» видны все плееблы с последним итогом.
+
+### 2. Прохождение
+
+Кто-то должен один раз пройти плеебл до кнопки установки. Варианты:
+
+| Способ | Как это выглядит |
 | --- | --- |
-| `protocol` | Shared types: events, traces, QR payload, chain |
-| `input-mapper` | `nx,ny` → CSS pixels per viewport / letterbox |
-| `orientation-guard` | Abort if orientation changes mid-session |
-| `device-catalog` | Android / iOS / tablet CSS sizes |
-| `test-chain` | Default Android → iOS → tablets sequence |
-| `recorder` | Append-only trace writer |
-| `playable-host` | Injected bridge (Luna / Cocos / vanilla) and the ad-SDK mock |
-| `adapters` | Detect engine from HTML |
-| `checks` | Ad-network profiles, file checks, replay checks |
-| `plugin-sdk` | Future E2E, smoke, heatmap, perf, network |
+| **На телефоне** | На экране появляется QR-код. Наводите камеру телефона — плеебл открывается на весь экран. Телефон должен быть в той же сети Wi-Fi. |
+| **Мышью на компьютере** | Плеебл открывается в окне размером с телефон. |
+| **AI** | Искусственный интеллект сам играет в плеебл, смотрит на экран и замечает поломки. |
+| **Быстрая проверка** | Без прохождения: только проверка, что плеебл загружается и ничего не нарушает. |
 
-## Run
+Пока вы играете на телефоне, на компьютере одновременно показываются копии плеебла на экранах других размеров: каждое касание сразу повторяется на всех. Видно, как одно и то же прохождение выглядит на iPhone SE и на iPad.
+
+Прохождение делается два раза — вертикально и горизонтально. Если телефон повернуть посреди записи, программа остановит её и попросит пройти этот шаг заново: смешивать ориентации нельзя, иначе результат будет недостоверным.
+
+Здесь же можно указать ссылки на ваше приложение в App Store и Google Play — тогда программа проверит, что кнопка установки ведёт именно туда.
+
+### 3. Проверка
+
+Программа повторяет записанное прохождение на всех экранах — без телефона и без человека. Касания попадают «в тот же предмет», а не просто в ту же точку: если на узком экране кнопка стоит ниже, программа это учитывает (для движков, где это возможно).
+
+Пока идёт проверка, видно, сколько экранов готово и сколько примерно осталось. Можно заниматься другими делами.
+
+### 4. Результат
+
+Сверху — один итог: **«Готов»**, **«Нужно посмотреть»** или **«Не готов»**. Под ним — ответы обычными словами на простые вопросы:
+
+- Открывает ли кнопка установки магазин?
+- Работает ли без интернета?
+- Помещается ли всё на экран?
+- Не звучит ли реклама раньше времени?
+
+Ответы разложены по группам: что нужно исправить, что стоит посмотреть, что не проверялось и что в порядке. У каждого ответа указано, о каких экранах речь.
+
+## Что именно проверяется
+
+### На каждом экране
+
+- **Загружается ли плеебл** вообще.
+- **Нет ли ошибок в коде**, которые ломают игру.
+- **Не пустой ли экран** — бывает, что всё «загрузилось», а на экране одна заливка.
+- **Реагирует ли на касания.**
+- **Кнопка установки**: срабатывает, открывает магазин той платформы (App Store на iPhone, Google Play на Android) и нужное приложение, не срабатывает сама без касания.
+- **Нет ли обращений в интернет**, если сеть их запрещает.
+- **Звук**: тишина до первого касания и тишина, когда реклама скрыта.
+- **Запрещённые возможности браузера**: запрос геолокации, камеры, уведомлений, всплывающие окна — это ошибка; вибрация, буфер обмена, запись данных в браузер — предупреждение, потому что запрещают их не все сети.
+- **Частота кадров** — не тормозит ли игра (зелёная зона 50+ кадров в секунду, жёлтая 30–50, красная ниже 30).
+- **Текст**: не уходит ли за край экрана, не обрезан ли, не слишком ли мелкий.
+- **Переводы**: плеебл открывается с разными языками телефона и сравнивается с английской версией — что не переведено и что перестало помещаться.
+
+### Нагрузочные сценарии
+
+- **Бездействие** — плеебл оставляют без касаний на 30 секунд (в настройках можно 2 или 5 минут): не должен упасть, погаснуть или сам открыть магазин; заодно видно, не растёт ли расход памяти.
+- **«Обезьянка»** — 40 случайных касаний и свайпов: не сломается ли игра от хаотичных действий.
+- **Поворот** — экран поворачивают и возвращают: картинка должна по-прежнему помещаться.
+
+### Сам файл
+
+- **Размер** против лимита конкретной сети, и сколько секунд он грузится на медленном 3G и на 4G.
+- **Из чего состоит файл**: доли картинок, звука, кода, и самые тяжёлые элементы списком — первое, что нужно смотреть, если сеть отклонила размер.
+- **Нет ли лишних внешних файлов** и ссылок на чужие приложения.
+- **Обязательные для сети вызовы и теги** в коде.
+
+### Экраны
+
+По умолчанию берётся по одному экрану каждой формы — вытянутые телефоны 21:9 и 20:9, обычный 16:9, планшеты 16:10 и 4:3, раскладной телефон — вместо четырёх почти одинаковых телефонов. Экраны iPhone и iPad проверяются на движке Safari, если он установлен. В настройках можно включить и выключить телефоны Android, iPhone, планшеты, раскладные телефоны и ориентации.
+
+### Рекламные сети
+
+У программы есть правила для 27 сетей: AppLovin, Unity Ads, Meta, Mintegral, Google Ads, TikTok / Pangle, ironSource, Vungle, Liftoff, Moloco, Snapchat и других. Для каждой — лимит размера, разрешённый способ открыть магазин и прочие требования. Требования сетей со временем меняются — перед важным релизом их стоит сверить.
+
+Пока плеебл проверяется, программа подменяет то, что сеть добавляет к рекламе в реальности (например, MRAID или `FbPlayableAd`). Поэтому нажатие «Установить» не уходит в настоящий магазин, а записывается и проверяется.
+
+## Все сборки под разные сети за один раз
+
+В разделе **«Сборки»** можно перетащить один архив со сборками под все сети. Программа разберёт его сама, поймёт, какая сборка для какой сети, проверит каждую и покажет таблицу: строка — сеть, столбец — вопрос (размер, упаковка, загрузка, ошибки, картинка, запросы в сеть, кнопка установки).
+
+Чтобы проверить кнопку установки во всех сборках, достаточно пройти **одну** сборку — запись повторится на всех остальных, и для каждой кнопка проверится по правилам её сети.
+
+## AI-тестировщик
+
+AI проходит плеебл как человек: смотрит на экран, нажимает, тянет, доходит до кнопки установки — вертикально и горизонтально. По дороге он отмечает, что видит: обрезанный или наложенный интерфейс, растянутую графику, игру, которая не реагирует или которую нельзя пройти, отсутствующую кнопку установки.
+
+Расход денег на AI сведён к минимуму:
+
+- AI играет только на одном экране в каждой ориентации, а на остальных экранах его прохождение просто повторяется без AI.
+- Каждый ход — одна маленькая картинка и несколько строк текста; старые картинки повторно не отправляются.
+- За один ход AI делает до пяти действий, поэтому прохождение — около десяти обращений, а не по одному на каждое касание.
+- Есть общий лимит на всю проверку; потраченное видно прямо во время работы и в отчёте.
+
+Можно выбрать Claude или GPT (ключ вводится в настройках), а можно режим «случайные касания» — без AI и бесплатно.
+
+## Как отдать результат
+
+Над каждым отчётом есть кнопки «Отдать»:
+
+| Кому | Что получает |
+| --- | --- |
+| **Менеджеру** | Одна HTML-страница: итог, видео прохождения прямо внутри, цифры и ответы обычными словами. |
+| **Клиенту** | ZIP-архив, который открывается без интернета: видео по ориентациям, картинка последнего кадра каждого экрана, список сетей со статусами и что проверялось. |
+| **Разработчику** | Полный технический отчёт: таблица «экраны × проверки», снимки после касаний, видео, ошибки, запросы в сеть, вызовы рекламных функций. |
+
+Для архива со сборками есть ещё **«Сводка по релизу»** — одна страница для печати или PDF: все сети против всех вопросов, замечания обычными словами и строки для подписей.
+
+Отчёты пишутся на русском, английском или французском — на языке программы.
+
+## Работа в команде
+
+- Программу запускает **один компьютер** в офисе. Остальные открывают ссылку в браузере и ничего не устанавливают — достаточно быть в той же сети Wi-Fi.
+- Каждый при первом входе вводит имя; оно стоит рядом с его проверками в истории.
+- Всё, что касается проверок, доступно каждому. Ключи AI, глубина проверок, установка компонентов и удаление истории — только на том компьютере, где программа запущена.
+- Ключи AI хранятся только на этом компьютере и никогда не попадают на страницу в браузере.
+- В «Настройки → Хранилище» видно, сколько места занимает история, и можно удалить старые проверки. Идущие сейчас проверки не удаляются.
+- Если для проверки нужно что-то скачать (браузер, запись видео, движок Safari), программа заранее говорит, что именно и сколько это весит, и ждёт согласия.
+
+## Запуск
+
+Нужен компьютер Mac или Windows с [Node.js](https://nodejs.org) 20 или новее.
+
+- **Mac:** дважды щёлкнуть `PlayGuard.command`.
+- **Windows:** дважды щёлкнуть `PlayGuard.bat`.
+- **Из терминала:**
 
 ```bash
 npm start
 ```
 
-One command builds the console, starts the hub, and opens the console in the
-browser (`http://localhost:8787`). The hub serves the console itself, so
-teammates on the same network open the address printed on start (also in
-Settings → Team) and install nothing. A short guide for the team, in Russian,
-is in `КАК-НАЧАТЬ.md`; the console has a Help section. On macOS `PlayGuard.command`, and on
-Windows `PlayGuard.bat`, do the same on a double click. The first start
-installs the dependencies. `npm run hub` and `npm run console` still start the
-two parts separately, with the console reloading on every change, for work on
-the lab itself; `HUB_PORT` and `CONSOLE_PORT` move them.
+Откроется браузер с программой (`http://localhost:8787`). Ссылка для коллег показывается в окне запуска и в «Настройки → Команда». Окно запуска не закрывайте — пока оно открыто, программа работает у всей команды.
 
-The console is a four-step wizard (**Check**):
+Если что-то не получается, в программе есть раздел **«Помощь»**: телефон не подключается, что значат итоги, как назвать файлы, чтобы сеть определилась сама, как очистить историю.
 
-1. **Upload** — drop one playable HTML, or a zip with the builds for several
-   networks. "Checked before" lists every playable with its latest verdict and
-   its earlier runs.
-2. **Playthrough** — pick who plays it once: a phone through the QR (same
-   Wi-Fi), the mouse in a phone-sized window on this computer, an AI tester, or
-   nobody (a quick load-only check). While waiting for the phone the console
-   shows whether it opened the page, and what to try when it does not connect.
-3. **Checks** — the recording is replayed on every screen; the console shows
-   how many screens are done and about how long is left.
-4. **Result** — one verdict (ready / needs a look / not ready) with the report
-   under it. **Download as one file** packs the report into a zip to send on.
+## Из чего состоит проект
 
-**Builds** and **Reports** keep the full tables for whoever wants them
-(the separate Recordings tab is turned off: the wizard keeps recordings by itself). **Settings** holds the language (Russian / English / French, also the
-language of new reports' summary), the AI tester's API keys, and what is
-installed on this computer, with one button to install the browser the checks
-and the report videos need. Keys are written to `.playable-lab/settings.json`
-(git-ignored, readable by the owner only), are passed to the runner and are
-never sent back to the page; the settings and run endpoints answer only to this
-computer.
-
-Interface texts live in `apps/lab-console/src/i18n.tsx`; problems are explained
-in plain words in `errors.tsx`, with the technical text folded under them.
-
-## What a check covers beyond the replay
-
-- **Sound.** Every screen measures what the playable sends to the speakers:
-  it must be silent until the first touch, and go quiet when the ad is hidden
-  (`sound-start`, `sound-hidden`). The runner's browser lets sound start
-  without a touch, as an ad container does, so a playable cannot hide behind
-  the browser's own block.
-- **Safari's engine.** iPhone and iPad screens run in WebKit when it is
-  installed; otherwise they run in Chromium and say so. Taps go through
-  Playwright's touchscreen, drags are dispatched inside the page. The AI
-  tester and the stress scenarios always use Chromium. `--no-webkit` turns it
-  off.
-- **Memory.** The idle scenario measures script memory before and after the
-  wait; steady growth while nothing happens is reported. Settings can stretch
-  the wait to 2 or 5 minutes.
-- **Stress scenarios** (`--stress`, on by default from the console), each on
-  one phone screen: `idle` (left without a touch: no crash, no blank screen,
-  no store opened by itself), `monkey` (40 seeded random taps and swipes),
-  `rotate` (turned on its side and back: the picture must still fit the
-  screen). `--stress idle,rotate` picks some, `--idle <ms>` sets the wait.
-- **Download time.** The file size as seconds on slow 3G and on 4G.
-- **What the file is made of.** Images, sound, code and packed data as shares
-  of the file, with the heaviest items listed: the first thing to read when a
-  network rejects the size. Assets are recognised whether they are embedded as
-  base64 or in the denser base122 that Luna exports use.
-- **Restricted browser features.** Every screen counts calls to what an ad
-  may not use: asking for the location, the camera or notifications, and
-  browser dialogs fail the check; vibration, the clipboard, the share sheet
-  and writes to browser storage (localStorage, sessionStorage, IndexedDB,
-  cookies) are warnings, since only some networks forbid them. Nothing is
-  blocked: the playable runs as it would, the calls are only counted.
-- **Install link.** With the app's store links entered at step 2 of the wizard
-  (or `--store-ios`, `--store-android`), every screen checks that the install
-  button opens the store of that device and the right app, and the file is
-  searched for links to another app. Without them the link is only shown. A
-  network call that carries no address, or a tracking link, cannot be compared
-  and says so.
-
-Settings → "Depth of the checks" turns the stress scenarios and the Safari
-engine on and off for every check the console starts.
-
-**For the manager** (the result of a check, and Reports) downloads one
-self-contained HTML file: the verdict, the video of the playthrough embedded
-in the page, the numbers, and the answers in plain words.
-
-**Pack for the client** (the result of a check, Reports, Builds) is a ZIP
-with a page that opens offline: the video of the playthrough per orientation
-(converted to MP4 when ffmpeg is on the computer, otherwise WebM), the last
-frame of every screen as a JPEG, the ad networks with their status, and what
-was checked. For an archive of builds it adds each network's frame and the
-release summary.
-
-**Release summary** (Builds, and the result of an archive in the wizard) is
-one printable page for a creative: every network's build against every
-question, the remarks in plain words, and lines for signatures. It is built
-from the reports in the language of the console; print it or save it as PDF.
-
-When something has to be downloaded (the browser for the checks, the video
-recorder, WebKit), the console says what and how much and asks once, before
-any check; the download starts only after the answer and shows its progress.
-
-## Team use
-
-- **Access.** Everything a teammate does — uploads, checks, AI runs, the app
-  links at step 2 — works from their browser. AI keys, the depth of the checks,
-  installing components, the iPhone simulator and deleting history are done on
-  the computer that runs the lab; requests from other sites are refused.
-- **Names.** The console asks each person for a name once; it goes with every
-  recording, check and archive and is shown in the history.
-- **Uploads.** One HTML, a ZIP, several files at once or a folder (picked or
-  dropped). Anything but a single file is packed into one archive in the
-  browser, and the hub finds the builds in it. RAR and 7z are refused with a
-  plain explanation.
-- **Handing over.** Above every report: to a manager (one page), to a client
-  (ZIP), to a developer (the full report).
-- **What to check.** Settings → What to check turns kinds of device
-  (Android phones, iPhones, tablets, foldables), orientations and ad networks
-  on and off for every check. Screens of a platform turned off are left out
-  (`--platforms`), an orientation turned off is skipped in checks without a
-  recording, and an archive's builds for a network turned off are marked
-  "skipped" instead of tested.
-- **History.** Settings → Storage shows what the history takes and deletes
-  checks older than 30 days, or everything; a single report, archive or
-  recording is deleted in its own section, after a confirmation. Running checks
-  are never deleted.
-
-## AI autoplay
-
-In the console: step 2 of the wizard, "AI plays it". It shows the tokens spent
-while it runs. From a terminal:
-
-```bash
-export ANTHROPIC_API_KEY=...        # or OPENAI_API_KEY for --ai gpt
-npm run autoplay -- --playable path/to/playable.html --network applovin
-npm run autoplay -- --playable path/to/playable.html --ai gpt --model gpt-5-mini --lang ru
-npm run autoplay -- --playable path/to/playable.html --ai monkey   # random taps: no model, no tokens
-```
-
-An AI tester plays the playable to the install button, in portrait and then
-in landscape, and reports what it sees: cut-off or overlapping UI, stretched
-art, a game that does not react or cannot be finished, a missing install
-button. It plays in a visible browser window, with a pink marker on every
-touch, and prints each turn to the terminal. The video and the turn list are
-in the report.
-
-Tokens are kept low by design:
-
-- One small screenshot per turn (JPEG, 640 px on the long side) and a few
-  lines of text. Earlier screenshots are never resent; earlier turns are one
-  line each.
-- The model answers with up to five inputs at a time (`tap 50 80`,
-  `drag 20 50 80 50`, `hold`, `wait`), so a playthrough is about ten calls,
-  not one per tap. It stops as soon as the store opens, after
-  `--max-turns` (14), or after three turns that changed nothing.
-- The AI plays on one screen per orientation (`--ai-devices`, default
-  Pixel 7). Its inputs are saved as a trace (`reports/<run>/ai-*.trace.json`)
-  and replayed on the rest of the format set without the model. Each
-  replayed screen then gets one call: the first and last frame, "does the
-  layout hold here?" (`--no-review` to skip).
-- `--budget` (80 000 tokens) caps the whole run; the terminal and the
-  report show what was used. Low effort is requested from the model.
-
-A default run is about 40 calls. `--ai-devices pixel-7,ipad-10` makes the
-AI play a phone and a tablet itself; `all` plays every screen and costs the
-most. Replayed taps are approximate on screens of another shape, so a
-missed install button there is a warning, not a failure.
-
-## Testing every network's build at once
-
-Open **Builds** in the console and drop a zip. It can hold bare HTML files,
-zipped builds and folders with an `index.html` and its assets, in any folder
-structure. Every build is matched to its network (from its path, else from
-the install API it calls), checked as a file, and loaded on every screen
-shape in both orientations. The table answers "which networks work": one row
-per build, one column per question (size, packaging, loads, JS errors,
-renders, requests, CTA).
-
-A load-only run cannot press the CTA. To cover it, press **Play it** on one
-build and play it once — on the phone through the QR, or on this computer
-with **Or play on this computer** — then **Replay on all builds**. The same
-recording is replayed on every build of the archive, and the CTA is judged
-against each network's own API.
-
-Uploads are kept under `batches/`.
-
-## Replay, checks, report
-
-```bash
-npm run replay -- --trace traces/<sessionId>.json --network applovin
-npm run check  -- --playable path/to/playable.html --network unity
-npx playwright install chromium ffmpeg   # once; without it Google Chrome is used and video is off
-```
-
-`replay` runs the trace on the screens that were mirrored while recording
-(`--devices a,b` or `--devices all` to override). `check` needs no trace: it
-only loads the playable, in both orientations, on the format set.
-
-The **format set** is the default in the console too: one screen per shape
-— 21:9, 20:9 and 16:9 phones, a 16:10 and a 4:3 tablet, a 6:5 unfolded
-foldable — instead of four near-identical phones. Neither
-needs the hub. `npm run replay -- --help` lists every option.
-
-Each run writes `reports/<run>/index.html` (screens × checks matrix,
-screenshots after taps, video, console, requests, ad API calls) and
-`report.json`. The exit code is 1 when any check fails.
-
-The report opens with a plain-language summary for people who do not read
-check names: one verdict (ready / works but needs a look / not ready), one
-line per orientation, then questions with answers — "Does the install button
-open the store?", "Does it work without the internet?" — grouped into needs
-fixing, worth checking, not tested and fine, each with the screens it is
-about. `--lang ru` writes it in Russian, `--lang fr` in French (`PLAYABLE_LAB_LANG`
-sets the default). The same summary is printed at the end of the run and saved as
-`summary` in `report.json`.
-
-Checks on every screen:
-
-| Check | Fails when |
+| Часть | Что делает |
 | --- | --- |
-| Loads | `load` never fires |
-| No JavaScript errors | an exception is uncaught (`console.error` only warns) |
-| Renders something | the final frame is one flat colour |
-| Reacts to input | warns when the frame is the same before and after the input |
-| No network requests | the playable asks for a file outside the HTML, or another host on a network that forbids it. Such requests get an empty local answer unless `--allow-external` |
-| CTA opens the store | the store call uses an API the network does not provide, fires before any input, or is missing with `--require-cta` / a recording that had one |
-| AI tester | autoplay only: fails on an issue that stops the player, warns on a clearly broken layout or a game the AI could not finish |
-| Lifecycle calls | Mintegral: `gameReady` never called |
+| `apps/lab-console` | Окно программы в браузере — мастер проверки, отчёты, настройки |
+| `apps/hub` | Сервер: принимает файлы, показывает QR, передаёт касания с телефона на все экраны, хранит историю |
+| `apps/playwright-runner` | Повторяет прохождение на всех экранах в настоящем браузере, запускает проверки и AI, пишет отчёт |
+| `apps/mobile` | Необязательное приложение-сканер для телефона (хватает и обычной камеры) |
+| `packages/*` | Общие части: список устройств, правила сетей, проверки, запись прохождения, пересчёт касаний под размер экрана |
+| `traces/` | Записанные прохождения |
+| `reports/` | Готовые отчёты |
+| `batches/` | Загруженные архивы со сборками |
 
-File checks (also shown in the console): size against the network limit,
-external and separate local files, the CTA call and required tags in source.
-
-### Ad networks
-
-`packages/checks/src/networks.ts` holds one profile per network. AppLovin,
-Unity Ads, Meta, Mintegral, Google Ads and TikTok / Pangle are described from
-the networks' own specs. ironSource, Vungle, Liftoff, Moloco, AdColony, Aarki,
-Appreciate, Snapchat, InMobi, Chartboost, Tapjoy, myTarget, Bigo, Kwai,
-Smadex, Adikteev, BigaBid, Kayzen, Remerge, Tencent and YouAppi come from
-exporter documentation: format and size limit, and an install call only
-where one is documented. Limits change over time; re-check before relying on
-a verdict.
-
-A build for a network with no profile is shown under the name its file
-carries and gets the general checks. Requests to the build tool's own
-analytics (`collector.lunalabs.io`) are listed but not counted against the
-build.
-
-The injected mock stands in for what networks add at serve time: `mraid`,
-`FbPlayableAd`, `window.install` / `gameReady` / `gameEnd`, `ExitApi`,
-`playableSDK`, `parent.postMessage('download')` and `window.open`. Calls are
-recorded as `adEvents` in the trace instead of leaving the page.
-
-## Development
-
-```bash
-npm test
-npm run typecheck
-```
-
-Native scanner (optional): `cd apps/mobile && npx expo start`.
-Without it, the phone Camera app opening the QR URL is enough.
-
-## Engines
-
-The host iframe does not patch game code. It injects a capture/replay
-bridge and serves the build same-origin (upload) or with `<base href>`
-for a remote Luna URL later.
-
-| Engine | What to drop on the console |
-| --- | --- |
-| Luna Playworks | Exported HTML (or later a preview URL) |
-| Cocos Creator | `web-mobile` `index.html` |
-| Clear JS | Any `index.html` |
-
-## Live sync
-
-When the phone starts loading the playable, every mirror starts loading
-with it, so the game clocks stay close. Input is mirrored at once; a mirror
-that is a few frames behind the phone's game time waits those frames (120 ms
-at most) to land on the same moment. Every instance gets the same
-`Math.random` seed, stored in the trace and reused by the replay. Mirrors
-are muted: only the phone plays sound.
-
-The phone page opens with a **Tap to start** button: the tap takes the page
-fullscreen (browser bars would make it shorter than a real placement) and
-locks the orientation, and only then loads the playable. In a browser that
-cannot go fullscreen (iPhone Safari) the page keeps its shorter shape.
-
-### Touches on other shapes
-
-A touch is "on the launcher" or "on that bubble", not "at 50% / 80% of the
-screen": another shape puts those things elsewhere. Where the engine's scene
-is reachable the bridge records a **scene anchor** with every sample and
-each screen (mirror or replay) resolves it in its own layout:
-
-| Engine | Found through | A touch becomes |
-| --- | --- | --- |
-| PixiJS | `window.__PIXI_APP__` | a point in the local space of the object group under the finger |
-| Unity / Luna | `window.UnityEngine` | the world point on the gameplay plane, or a point inside the UI control it hit |
-
-Anything else falls back to the fraction of the screen, and the console says
-so under the mirror ("taps approximate").
-
-The console adds a **phone replica** mirror with the phone's exact viewport:
-that one is a true copy. Other screens receive the same normalised gesture,
-but a playable that lays itself out differently per aspect ratio can read it
-differently (a drag that starts above the launcher on the phone may start on
-it on a shorter screen). The console marks such mirrors "other shape · taps
-approximate". Record each chain step on a phone of that group, fullscreen,
-and the mirrors of the same shape follow exactly.
-
-## Phone FPS
-
-The phone reports its frame rate once a second from page start to the end of
-the session. The console charts it live over three zones (green 50+, yellow
-30–50, red under 30) with the average, minimum and share of time per zone.
-The samples are saved in the trace (`perf`) and the replay report repeats
-the chart and adds a frame-rate check.
-
-## Timing
-
-Every sample carries `rt`: milliseconds since the playable's `load` event on
-the phone. Replay dispatches at the same offset from its own `load`, with
-real touch events (multi-touch included). Traces without `rt` are timed from
-their first event, `--lead-in` ms after load.
-
-## Orientation rule
-
-A session has `orientationLock: portrait | landscape`. Resize / rotate that
-breaks the lock aborts with `ORIENTATION_CHANGED` and a replay reason.
-To cover both orientations, use two chain steps.
-
-## Future plugins
-
-See `plugins/README.md`. They subscribe to traces; they do not own input.
+Подробности для разработчиков — команды, параметры, устройство синхронизации и все проверки — в [docs/TECHNICAL.md](docs/TECHNICAL.md).

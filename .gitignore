@@ -10,3 +10,7 @@ playables/**
 *.log
 batches/
 .playable-lab/
+
+# Video production: local Python env and voice model
+video/.venv/
+video/models/

@@ -578,7 +578,8 @@ const launch = async (headless: boolean): Promise<Browser> => {
   const channel = option("--channel");
   // An ad container lets sound start without a touch; with the browser's own
   // block in place a playable that breaks the "silent until touched" rule would pass.
-  const args = ["--autoplay-policy=no-user-gesture-required"];
+  // Nothing reaches the speakers: the sound checks listen inside the page.
+  const args = ["--autoplay-policy=no-user-gesture-required", "--mute-audio"];
   if (channel) {
     return chromium.launch({ headless, channel, args });
   }

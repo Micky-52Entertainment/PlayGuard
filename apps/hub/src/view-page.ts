@@ -94,11 +94,14 @@ export const renderViewPage = (params: {
     @keyframes turn-land { 0%, 25% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
     @keyframes turn-port { 0%, 25% { transform: rotate(-90deg); } 60%, 100% { transform: rotate(0); } }
     #note { margin: 0; max-width: 30ch; font-size: 13px; line-height: 1.45; color: #94a1b2; }
+    /* On a computer the window may refuse to turn: the playable keeps the
+       shape of the pass in a box scaled to fit, whatever the window does. */
+    body.desktop iframe { position: absolute; left: 50%; top: 50%; transform-origin: 0 0; }
     #abort h1 { font-size: 18px; margin: 0 0 8px; }
     #abort p { font-size: 14px; line-height: 1.45; color: #fca5a5; }
   </style>
 </head>
-<body>
+<body${params.role === "source" && params.desktop ? ' class="desktop"' : ""}>
   ${
     params.role === "source" && !params.desktop
       ? `<iframe id="playable" name="playable_source" data-src="${params.playableSrc}" allow="autoplay; fullscreen"></iframe>
@@ -122,9 +125,31 @@ export const renderViewPage = (params: {
       var abortBox = document.getElementById("abort");
       var reasonEl = document.getElementById("reason");
 
+      // A computer window plays in a box of the pass's shape (see the style).
+      var desktopBox = role === "source" && document.body.className === "desktop"
+        ? (lock === "landscape" ? { w: 915, h: 412 } : { w: 412, h: 915 })
+        : null;
+      function fitDesktop() {
+        if (!desktopBox) {
+          return;
+        }
+        var scale = Math.min(1, window.innerWidth / desktopBox.w, window.innerHeight / desktopBox.h);
+        frame.style.width = desktopBox.w + "px";
+        frame.style.height = desktopBox.h + "px";
+        frame.style.transform = "scale(" + scale + ") translate(-50%, -50%)";
+      }
+      fitDesktop();
+      window.addEventListener("resize", fitDesktop);
+      function sourceWidth() {
+        return desktopBox ? desktopBox.w : window.innerWidth;
+      }
+      function sourceHeight() {
+        return desktopBox ? desktopBox.h : window.innerHeight;
+      }
+
       function viewport() {
-        var w = window.innerWidth || 1;
-        var h = window.innerHeight || 1;
+        var w = sourceWidth() || 1;
+        var h = sourceHeight() || 1;
         return {
           cssWidth: w,
           cssHeight: h,
@@ -239,8 +264,8 @@ export const renderViewPage = (params: {
           send({
             type: "source_started",
             sessionId: sessionId,
-            cssWidth: window.innerWidth,
-            cssHeight: window.innerHeight
+            cssWidth: sourceWidth(),
+            cssHeight: sourceHeight()
           });
           return;
         }
@@ -248,8 +273,8 @@ export const renderViewPage = (params: {
           send({
             type: "source_loaded",
             sessionId: sessionId,
-            cssWidth: window.innerWidth,
-            cssHeight: window.innerHeight
+            cssWidth: sourceWidth(),
+            cssHeight: sourceHeight()
           });
           return;
         }
@@ -281,8 +306,8 @@ export const renderViewPage = (params: {
           send({
             type: "orientation",
             sessionId: sessionId,
-            cssWidth: window.innerWidth,
-            cssHeight: window.innerHeight
+            cssWidth: sourceWidth(),
+            cssHeight: sourceHeight()
           });
         });
 
@@ -310,9 +335,14 @@ export const renderViewPage = (params: {
           }
           try {
             var result = requestFs.call(root, { navigationUI: "hide" });
-            return result && result.then
-              ? result.then(function () { return true; }, function () { return false; })
-              : Promise.resolve(true);
+            if (!result || !result.then) {
+              return Promise.resolve(true);
+            }
+            // Some in-app browsers never answer: start without fullscreen then.
+            return Promise.race([
+              result.then(function () { return true; }, function () { return false; }),
+              new Promise(function (resolve) { setTimeout(function () { resolve(fullscreenNow()); }, 1500); })
+            ]);
           } catch (_) {
             return Promise.resolve(false);
           }

@@ -364,6 +364,20 @@ export const RecordView = ({
   const selectedDevices = devices
     .filter((device) => selectedIds.includes(device.id))
     .sort((a, b) => shape(b) - shape(a));
+  // A phone's touch does not land on the same thing on a tablet, so tablets are
+  // left out of the live copies of a phone recording. They are still checked:
+  // the recording is replayed on them afterwards.
+  const tabletsHidden = step?.group !== "tablet" && selectedDevices.some((device) => device.group === "tablet");
+  const liveDevices = tabletsHidden ? selectedDevices.filter((device) => device.group !== "tablet") : selectedDevices;
+  // A different shape means a different layout: the same relative tap can
+  // land on another element there.
+  const reshapedFor = (device: DeviceProfile): boolean => {
+    if (!sourceSize) {
+      return false;
+    }
+    const size = deviceCssSize(device, orientation);
+    return Math.abs((size.cssWidth / size.cssHeight) / (sourceSize.width / sourceSize.height) - 1) > 0.01;
+  };
   // Fit every screen on the stage at once, in as few rows as it takes, so
   // nothing needs scrolling while the phone is being played.
   useEffect(() => {
@@ -372,7 +386,7 @@ export const RecordView = ({
       return;
     }
     const fit = (): void => {
-      const sizes = selectedDevices.map((device) => deviceCssSize(device, orientation)).map((size) => ({ w: size.cssWidth, h: size.cssHeight }));
+      const sizes = liveDevices.map((device) => deviceCssSize(device, orientation)).map((size) => ({ w: size.cssWidth, h: size.cssHeight }));
       if (sourceSize) {
         sizes.unshift({ w: sourceSize.width, h: sourceSize.height });
       }
@@ -380,8 +394,9 @@ export const RecordView = ({
         return;
       }
       const width = box.clientWidth - 32;
-      const height = box.clientHeight - 36;
-      const caption = 44;
+      const height = box.clientHeight - 36 - Array.from(box.querySelectorAll<HTMLElement>(".mirrors-note")).reduce((sum, note) => sum + note.offsetHeight + 20, 0);
+      // The caption block and its gap (styles.css: .mirror figcaption).
+      const caption = 52;
       // Lay the screens out as the stage wraps them, and measure the height it takes.
       const tallAt = (zoomLevel: number): number => {
         let rowWidth = 0;
@@ -416,7 +431,7 @@ export const RecordView = ({
     const watch = new ResizeObserver(fit);
     watch.observe(box);
     return () => watch.disconnect();
-  }, [autoZoom, selectedIds.join(","), orientation, sourceSize?.width, sourceSize?.height]);
+  }, [autoZoom, selectedIds.join(","), tabletsHidden, orientation, sourceSize?.width, sourceSize?.height]);
 
   const chipDevices = devices
     .filter((device) => allScreens || FORMAT_SET.includes(device.id) || selectedIds.includes(device.id))
@@ -944,10 +959,17 @@ export const RecordView = ({
             </div>
           )}
           <div className="mirrors" ref={mirrorsRef}>
+            {tabletsHidden && <p className="mirrors-note">{t("record.tabletsLater")}</p>}
+            {session && mapping && sourceSize && liveDevices.some((device) => reshapedFor(device)) && (
+              <p className="mirrors-note" title={t(mapping === "scene" ? "record.mapScene.tip" : "record.mapFraction.tip")}>
+                <i className={mapping === "scene" ? "mapped" : "reshaped"}>≈</i>{" "}
+                {t(mapping === "scene" ? "record.mapScene" : "record.mapFraction")}
+              </p>
+            )}
             {session && sourceSize && (
               <figure className="mirror source" key="source-replica" style={{ width: sourceSize.width * zoom }}>
                 <figcaption>
-                  <b>
+                  <b title={t("record.replica")}>
                     {phase === "recording" && <span className="live-dot" aria-hidden="true" />}
                     {t("record.replica")}
                   </b>
@@ -983,32 +1005,24 @@ export const RecordView = ({
             {selectedDevices.length === 0 && (
               <p className="hint">{t("record.pickScreen")}</p>
             )}
-            {selectedDevices.map((device) => {
+            {liveDevices.map((device) => {
               const size = deviceCssSize(device, orientation);
-              // A different shape means a different layout: the same relative
-              // tap can land on another element there.
-              const reshaped =
-                sourceSize !== null &&
-                Math.abs(
-                  (size.cssWidth / size.cssHeight) / (sourceSize.width / sourceSize.height) - 1
-                ) > 0.01;
+              const reshaped = reshapedFor(device);
               return (
                 <figure className="mirror" key={device.id} style={{ width: size.cssWidth * zoom }}>
                   <figcaption>
                     <b title={device.name}>{device.name}</b>
                     <span>
                       {formatLabel(device)} · {size.cssWidth}×{size.cssHeight}
+                      {session && reshaped && mapping && (
+                        <i
+                          className={mapping === "scene" ? "mapped" : "reshaped"}
+                          title={t(mapping === "scene" ? "record.mapScene.tip" : "record.mapFraction.tip")}
+                        >
+                          ≈
+                        </i>
+                      )}
                     </span>
-                    {session && reshaped && mapping === "scene" && (
-                      <span className="mapped" title={t("record.mapScene.tip")}>
-                        {t("record.mapScene")}
-                      </span>
-                    )}
-                    {session && reshaped && mapping === "fraction" && (
-                      <span className="reshaped" title={t("record.mapFraction.tip")}>
-                        {t("record.mapFraction")}
-                      </span>
-                    )}
                   </figcaption>
                   <div
                     className="frame"

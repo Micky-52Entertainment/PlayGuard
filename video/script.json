@@ -1,0 +1,212 @@
+{
+ "voice": "af_heart",
+ "speed": 1.0,
+ "pitch": 1.12,
+ "lines": [
+  {
+   "id": "a1_01",
+   "at": 3.0,
+   "text": "Your playable got rejected."
+  },
+  {
+   "id": "a1_02",
+   "at": 7.0,
+   "text": "Again."
+  },
+  {
+   "id": "a1_03",
+   "at": 15.0,
+   "text": "It worked perfectly..."
+  },
+  {
+   "id": "a1_04",
+   "at": 20.0,
+   "text": "...on your phone."
+  },
+  {
+   "id": "a1_05",
+   "at": 25.0,
+   "text": "But on a tablet?"
+  },
+  {
+   "id": "a1_06",
+   "at": 30.0,
+   "text": "In landscape?"
+  },
+  {
+   "id": "a1_07",
+   "at": 35.0,
+   "text": "Seventeen devices..."
+  },
+  {
+   "id": "a1_08",
+   "at": 40.0,
+   "text": "two orientations. Thirty-four screens."
+  },
+  {
+   "id": "a1_09",
+   "at": 44.0,
+   "text": "And twenty-seven ad networks, each with its own rules."
+  },
+  {
+   "id": "a1_10",
+   "at": 49.0,
+   "text": "That's over six hundred checks."
+  },
+  {
+   "id": "a1_11",
+   "at": 55.0,
+   "text": "By hand, it takes hours."
+  },
+  {
+   "id": "a1_12",
+   "at": 61.0,
+   "text": "And something still slips through."
+  },
+  {
+   "id": "a1_13",
+   "at": 69.0,
+   "text": "Hi, I'm Micky! Play it once, and I'll check the rest."
+  },
+  {
+   "id": "a2_01",
+   "at": 75.0,
+   "text": "Here's how it works."
+  },
+  {
+   "id": "a2_02",
+   "at": 80.0,
+   "text": "You play the game once, on your phone."
+  },
+  {
+   "id": "a2_03",
+   "at": 85.0,
+   "text": "Every tap is replayed..."
+  },
+  {
+   "id": "a2_04",
+   "at": 92.0,
+   "text": "on all thirty-four screens at once."
+  },
+  {
+   "id": "a2_05",
+   "at": 98.0,
+   "text": "Four steps, and you're done."
+  },
+  {
+   "id": "a3_01",
+   "at": 105.0,
+   "text": "Step one: upload your playable."
+  },
+  {
+   "id": "a3_02",
+   "at": 110.0,
+   "text": "One HTML file, or a zip with builds for every network."
+  },
+  {
+   "id": "a3_03",
+   "at": 117.0,
+   "text": "I'll sort out the networks for you."
+  },
+  {
+   "id": "a3_04",
+   "at": 124.0,
+   "text": "And every past check is right at hand."
+  },
+  {
+   "id": "a3_04b",
+   "at": 0,
+   "text": "Like this one: the build links to the wrong app in the App Store. Caught before it ships!"
+  },
+  {
+   "id": "a3_05",
+   "at": 130.0,
+   "text": "Step two: play it."
+  },
+  {
+   "id": "a3_06",
+   "at": 136.0,
+   "text": "Scan the QR code with a phone on the same Wi-Fi."
+  },
+  {
+   "id": "a3_07",
+   "at": 150.0,
+   "text": "No phone? Use your mouse, let the AI play, or just check that it loads."
+  },
+  {
+   "id": "a3_08",
+   "at": 160.0,
+   "text": "Step three: I replay your session on every screen."
+  },
+  {
+   "id": "a3_09",
+   "at": 166.0,
+   "text": "File size, format, install button, errors, FPS, sound..."
+  },
+  {
+   "id": "a3_10",
+   "at": 173.0,
+   "text": "And if something's off, I'll show you exactly where."
+  },
+  {
+   "id": "a3_11",
+   "at": 180.0,
+   "text": "I even tell you how long is left."
+  },
+  {
+   "id": "a3_12",
+   "at": 185.0,
+   "text": "Step four: one clear verdict."
+  },
+  {
+   "id": "a3_13",
+   "at": 190.0,
+   "text": "Ready. Needs a look. Or not ready."
+  },
+  {
+   "id": "a3_14",
+   "at": 195.0,
+   "text": "With a full report underneath."
+  },
+  {
+   "id": "a3_15",
+   "at": 200.0,
+   "text": "Download it as one file and send it to your team."
+  },
+  {
+   "id": "a4_01",
+   "at": 205.0,
+   "text": "Start it with a double click."
+  },
+  {
+   "id": "a4_02",
+   "at": 211.0,
+   "text": "Teammates just open the address in a browser..."
+  },
+  {
+   "id": "a4_03",
+   "at": 218.0,
+   "text": "with nothing to install."
+  },
+  {
+   "id": "a4_04",
+   "at": 224.0,
+   "text": "The whole team checks in one place."
+  },
+  {
+   "id": "a5_01",
+   "at": 230.0,
+   "text": "Before: hours and risk. Now: minutes and confidence."
+  },
+  {
+   "id": "a5_02",
+   "at": 238.0,
+   "text": "Play it once. Leave the rest to Micky!"
+  },
+  {
+   "id": "a5_03",
+   "at": 252.0,
+   "text": "Just double-click PlayGuard dot command, and try it today!"
+  }
+ ]
+}

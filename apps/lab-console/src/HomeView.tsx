@@ -660,7 +660,9 @@ const PlayStep = ({ flow, setFlow, batches, health, settings, onSettings, onReco
   const [override, setOverride] = useState(false);
   const appsKey = settings ? `${settings.apps.ios.text}|${settings.apps.android.text}` : "";
   useEffect(() => {
-    if (!flow.playableId) {
+    // The built-in sample has no store link to match: trying it is never blocked.
+    if (!flow.playableId || flow.playableId === "sample-tap") {
+      setGate(null);
       return;
     }
     let stale = false;

@@ -708,6 +708,13 @@ export const SettingsView = ({ settings, onSettings, health, onInstall, onTour, 
             <button onClick={onTour}>{t("settings.tour")}</button>
           </section>
         </div>
+        <footer className="studio">
+          <span className="studio-logo" role="img" aria-label="52 Entertainment" />
+          <div className="studio-text">
+            <p className="studio-name">PlayGuard · 52 Entertainment</p>
+            <p className="studio-rights">{t("settings.rights", { year: new Date().getFullYear() })}</p>
+          </div>
+        </footer>
       </div>
     </div>
   );
