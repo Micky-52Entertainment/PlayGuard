@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>PlayGuard Demo</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #1e1b4b; font-family: system-ui, sans-serif; color: #f8fafc; user-select: none; }
+    #hint { position: absolute; top: 6%; width: 100%; text-align: center; font-size: 5vmin; }
+    .star { position: absolute; width: 16vmin; height: 16vmin; margin: -8vmin 0 0 -8vmin; border: 0; border-radius: 50%; background: #facc15; font-size: 9vmin; line-height: 16vmin; padding: 0; cursor: pointer; }
+    #end { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 4vmin; background: rgba(15, 23, 42, 0.92); }
+    #end h1 { margin: 0; font-size: 8vmin; }
+    #install { border: 0; border-radius: 4vmin; padding: 3vmin 9vmin; background: #22c55e; color: #052e16; font-size: 6vmin; font-weight: 700; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="hint">Tap the 3 stars</div>
+  <div id="end">
+    <h1>Well done!</h1>
+    <button id="install">Install</button>
+  </div>
+  <script>
+    (function () {
+      // Demo for PlayGuard: three taps, then an end card with the install button.
+      var STORE = "https://play.google.com/store/apps/details?id=com.example.demo";
+      var spots = [[0.3, 0.35], [0.7, 0.55], [0.4, 0.75]];
+      var left = spots.length;
+
+      spots.forEach(function (spot) {
+        var star = document.createElement("button");
+        star.className = "star";
+        star.textContent = "★";
+        star.style.left = spot[0] * 100 + "%";
+        star.style.top = spot[1] * 100 + "%";
+        star.addEventListener("click", function () {
+          star.remove();
+          left -= 1;
+          if (left === 0) {
+            document.getElementById("end").style.display = "flex";
+          }
+        });
+        document.body.appendChild(star);
+      });
+
+      function install() {
+        mraid.open(STORE);
+      }
+
+      document.getElementById("install").addEventListener("click", install);
+    })();
+  </script>
+</body>
+</html>

@@ -200,6 +200,7 @@ function micky(poses, pos, height, opts) {
     if (opts.flip) S(l).setValue([-sc, sc]);
     var kind = i ? "swap" : (opts.land ? "land" : (opts.noPop ? null : "pop"));
     if (kind) squash(S(l), poses[i][0], sc, opts.flip, kind);
+    if (kind == "pop" || kind == "land") sfx("bubble", poses[i][0], -12);
     S(l).expression = TALKX + " [value[0]*(1-a*0.03), value[1]*(1+a*0.06)]";
     P(l).expression = TALKX + " value + [0, Math.sin(time*3.2)*" + (height * 0.01).toFixed(1) + " - a*" + (height * 0.025).toFixed(1) + "]";
     shadow(l, 30, 10, 30);
@@ -457,8 +458,8 @@ function historyList(t0, t1) {
   burst(d + 1.2, [960, 400], 20, 380); shake(d + 1.2, 0.3, 12); sfx("ding", d + 1.2, -8);
   K(S(cnt), [[d + 1.2, [100, 100]], [d + 1.3, [118, 118]], [d + 1.5, [100, 100]]], 50);
   cnt.property("ADBE Text Properties").property("ADBE Text Document").expression =
-    "Math.round(linear(time," + d + "," + (d + 1.2) + ",0,600)) + (time>" + (d + 1.2) + "?'+':'')";
-  text("checks for one playable", d + 0.4, t1, [960, 560], 52, C.white);
+    "Math.round(linear(time," + d + "," + (d + 1.2) + ",0,887))";
+  text("checks · one zip · six networks", d + 0.4, t1, [960, 560], 52, C.white);
 })();
 
 // 4 PAIN: phones pile up, the clock spins
@@ -492,7 +493,7 @@ function historyList(t0, t1) {
   K(P(j[0]), [[t0, [W / 2, 1500]], [t0 + 0.45, [W / 2 - 150, 560]], [t0 + 0.9, [W / 2 - 330, 820]]], 50);
   K(R(j[0]), [[t0, -15], [t0 + 0.9, 8]], 50);
   P(j[0]).expression = "";
-  sfx("whoosh", t0, -8); sfx("pop", t0 + 0.9, -6);
+  sfx("whoosh2", t0, -8); sfx("stamp", t0 + 0.9, -10);
   micky([[t0 + 0.9, L("a1_13"), "s1_03"], [L("a1_13"), LE("a1_13"), "s2_21"], [LE("a1_13"), t1, "s2_31"]], [W / 2 - 330, 600], 440, { land: true });
   ripple(t0 + 0.9, [W / 2 - 330, 820], C.cyan);
   shake(t0 + 0.9, 0.3, 14); burst(t0 + 0.9, [W / 2 - 330, 820], 14, 240);
@@ -526,7 +527,7 @@ function historyList(t0, t1) {
   v.motionBlur = true;
   shadow(v, 55, 24, 60); fade(v, c + 0.1, e, 0.3);
   sfx("whoosh", c, -10);
-  for (var i = 0; i < 6; i++) sfx("ding", d + 0.2 + i * 0.12, -20 - i);
+  for (var i = 0; i < 6; i++) sfx("tick", d + 0.2 + i * 0.12, -18 - i);
   // four steps
   var labels = ["Upload", "Play", "Checks", "Result"];
   for (var i = 0; i < 4; i++) {
@@ -605,7 +606,11 @@ function historyList(t0, t1) {
   var s = SC.checks, t0 = s.start, t1 = s.end;
   stepTag(3, "CHECKS", t0, t1);
   var a = L("a3_08"), b = L("a3_09"), c = L("a3_10"), d = L("a3_11");
-  card("build/media/04_portrait_end.png", t0, b, [[t0, [1700, 1300], 45], [b, [1700, 1300], 58]]);
+  var wall = comp.layers.add(foot("build/media/replay_wall.mp4"));
+  wall.startTime = t0; span(wall, t0, b + 0.4);
+  K(S(wall), [[t0, [92, 92]], [b, [104, 104]]], 0);
+  K(P(wall), [[t0, [W / 2 + 1400, H / 2 - 40]], [t0 + 0.45, [W / 2, H / 2 - 40]], [b, [W / 2, H / 2 - 40]], [b + 0.4, [W / 2 - 1400, H / 2 - 40]]], 85);
+  wall.motionBlur = true; sfx("whoosh", t0, -14);
   var items = ["File size", "Format", "Install button", "Errors", "FPS", "Sound"];
   for (var i = 0; i < 6; i++) {
     var at = b + i * 0.5, x = 540 + (i % 3) * 420, y = 430 + Math.floor(i / 3) * 170;
@@ -615,7 +620,7 @@ function historyList(t0, t1) {
     var nt = text(items[i], at, c, [x + 30, y + 14], 36, C.ink);
     var g = group([box, ok, tick, nt], at, c, [0, 0]);
     pop(g, at); shadow(box, 35, 10, 25);
-    sfx("ding", at + 0.2, -16); burst(at + 0.2, [x - 130, y], 6, 110, [C.green, C.white]);
+    sfx("tick", at + 0.2, -14); burst(at + 0.2, [x - 130, y], 6, 110, [C.green, C.white]);
   }
   // where it went wrong
   var lp = phone("build/media/debug_landscape.png", c, d, [800, 480], 900);
@@ -654,7 +659,11 @@ function historyList(t0, t1) {
   stamp("NEEDS A LOOK", C.amber, b + 0.7, b + 1.4);
   stamp("NOT READY", C.red, b + 1.4, c);
   micky([[a, b + 0.7, "s2_32"], [b + 0.7, b + 1.4, "s1_13"], [b + 1.4, c, "s2_11"]], [1650, 700], 400);
-  historyList(c, d + 0.6);
+  card("build/media/06_report.png", c, c + 1.6, [[c, [1920, 1200], 45], [c + 1.6, [1600, 900], 62]]);
+  var vb = image("build/media/09_verdict_block.png", c + 1.6, d + 0.6, [W / 2, H / 2 - 40], 76);
+  pop(vb, c + 1.6, 76); shadow(vb, 55, 24, 60);
+  var vbo = rect(1740, 400, C.red, c + 2.0, d + 0.6, [W / 2, H / 2 - 40], { round: 28, fill: false, stroke: [C.red, 6] });
+  pop(vbo, c + 2.0); sfx("error", c + 2.0, -12);
   var zip = rect(200, 240, C.amber, d + 0.6, t1, [W / 2, H / 2], { round: 22 });
   var zt = text("ZIP", d + 0.6, t1, [W / 2, H / 2 + 20], 64, C.ink);
   var zg = group([zip, zt], d + 0.6, t1, [W / 2, H / 2]);
@@ -675,7 +684,7 @@ function historyList(t0, t1) {
   var cur = path([[0, 0], [0, 60], [16, 46], [28, 72], [38, 67], [27, 42], [48, 42], [0, 0]], C.white, 5, a, b, [W / 2 + 300, H / 2 + 200]);
   K(P(cur), [[a, [W / 2 + 300, H / 2 + 200]], [a + 0.6, [W / 2 + 20, H / 2]]], 80);
   K(S(icon), [[a + 0.7, [60, 60]], [a + 0.8, [54, 54]], [a + 0.9, [60, 60]], [a + 1.0, [54, 54]], [a + 1.1, [64, 64]]], 0);
-  sfx("click", a + 0.75, -6); sfx("click", a + 0.95, -6);
+  sfx("dblclick", a + 0.7, -6);
   // the address, typed
   var addr = text("", b, t1, [W / 2, 300], 64, C.white, { font: "Menlo-Bold" });
   addr.property("ADBE Text Properties").property("ADBE Text Document").expression =
@@ -711,7 +720,7 @@ function historyList(t0, t1) {
   micky([[b, c - 0.4, "s1_20"], [c - 0.4, t1 - 1.2, "s2_21"]], [560, 600], 520);
   var logo = image("build/media/logo_playguard.png", b + 0.6, t1, [1250, 380], 50);
   pop(logo, b + 0.6, 50); shadow(logo, 40, 12, 40);
-  flash(b + 0.6, [1250, 380], logo); burst(b + 0.6, [1250, 380], 26, 520); shake(b + 0.6, 0.3, 10);
+  flash(b + 0.6, [1250, 380], logo); sfx("impact", b + 0.6, -10); burst(b + 0.6, [1250, 380], 26, 520); shake(b + 0.6, 0.3, 10);
   var nm = text("PlayGuard", b + 0.9, t1, [1250, 640], 120, C.white); fade(nm, b + 0.9, t1, 0.3);
   var tag = text("Play once. Check everywhere.", b + 1.3, t1, [1250, 730], 50, C.cyan); fade(tag, b + 1.3, t1, 0.3);
   // the call to action for the team

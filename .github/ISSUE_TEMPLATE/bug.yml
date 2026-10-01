@@ -1,0 +1,47 @@
+name: Нашёл ошибку
+description: Программа сработала не так, как ожидалось
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Что случилось
+      description: Что вы делали и что увидели. Скриншот очень помогает.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидали
+    validations:
+      required: true
+  - type: input
+    id: playable
+    attributes:
+      label: Плеебл и рекламная сеть
+      placeholder: например, game_applovin.html, AppLovin
+  - type: dropdown
+    id: step
+    attributes:
+      label: На каком шаге
+      options:
+        - Загрузка
+        - Прохождение на телефоне
+        - Прохождение мышью
+        - AI-тестировщик
+        - Проверка
+        - Результат и отчёт
+        - Сборки
+        - Настройки
+        - Запуск программы
+        - Другое
+  - type: textarea
+    id: report
+    attributes:
+      label: Отчёт
+      description: Если проверка дошла до конца — приложите отчёт «Разработчику» или укажите папку из reports/.
+  - type: input
+    id: computer
+    attributes:
+      label: Компьютер и браузер
+      placeholder: например, macOS 15, Chrome 140
