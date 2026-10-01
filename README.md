@@ -1,197 +1,197 @@
 # PlayGuard
 
-**PlayGuard проверяет плееблы — интерактивную мини-игру внутри рекламы — до того, как они уйдут в рекламную сеть.**
+**PlayGuard checks playables — the interactive mini-games inside ads — before they go to an ad network.**
 
-Плеебл один раз проходят на телефоне (или мышью, или это делает AI). Программа повторяет это прохождение на десятках экранов разной формы, следит за ошибками, звуком, кнопкой установки и правилами каждой рекламной сети, а в конце выдаёт один понятный итог: **«Готов»**, **«Нужно посмотреть»** или **«Не готов»**.
+Someone plays the playable once: on a phone, with the mouse, or an AI does it. PlayGuard replays that playthrough on screens of every shape and watches for errors, sound, the install button and each ad network's rules. In the end it gives one clear verdict: **Ready**, **Needs a look** or **Not ready**.
 
-![Итог проверки](docs/images/3-result.png)
+![Result of a check](docs/images/3-result.png)
 
-> Как запустить и чем пользоваться — коротко в [КАК-НАЧАТЬ.md](КАК-НАЧАТЬ.md).
-> Техническое описание для разработчиков — в [docs/TECHNICAL.md](docs/TECHNICAL.md).
+> How to start and use it, in short: [КАК-НАЧАТЬ.md](КАК-НАЧАТЬ.md) (Russian).
+> Technical description for developers: [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
 ---
 
-## Зачем это нужно
+## Why it exists
 
-Плеебл, который отлично работает на телефоне разработчика, может:
+A playable that works fine on the developer's phone can still:
 
-- обрезаться на длинном Android или на квадратном планшете;
-- сломаться при повороте экрана;
-- не открыть магазин по кнопке «Установить» — или открыть не то приложение;
-- превысить лимит размера файла, который ставит сеть;
-- обращаться в интернет, что многие сети запрещают;
-- играть звук до первого касания;
-- работать в Chrome, но падать в Safari на iPhone.
+- get cut off on a tall Android phone or a squarish tablet;
+- break when the screen is rotated;
+- fail to open the store from the Install button, or open the wrong app;
+- go over the file size limit of the network;
+- reach out to the internet, which many networks forbid;
+- play sound before the first touch;
+- work in Chrome but crash in Safari on an iPhone.
 
-Сеть такой плеебл отклонит, а если пропустит — реклама будет плохо работать и терять деньги. Раньше всё это проверяли руками на нескольких телефонах. PlayGuard делает то же самое на всех формах экранов сразу, одинаково каждый раз, и записывает результат так, чтобы его понял любой человек, а не только разработчик.
+A network rejects such a playable, and if it lets it through, the ad performs badly and loses money. These things used to be checked by hand on a few phones. PlayGuard checks every screen shape at once, the same way every time, and writes the result so that anyone can read it, not only a developer.
 
-## Что делает программа — по шагам
+## What it does, step by step
 
-Работа идёт как мастер из четырёх шагов.
+A check is a wizard with four steps.
 
-### 1. Загрузка
+### 1. Upload
 
-Перетащите в окно программы:
+Drop into the window:
 
-- один HTML-файл плеебла;
-- ZIP-архив со сборками под разные сети;
-- несколько файлов или целую папку.
+- one playable HTML file;
+- a ZIP with builds for several networks;
+- several files or a whole folder.
 
-Программа сама понимает, на чём сделан плеебл (Luna Playworks, Cocos Creator, обычный HTML5/JavaScript), и по имени файла или по коду определяет, для какой рекламной сети сборка. В разделе «Проверялось раньше» видны все плееблы с последним итогом.
+PlayGuard recognises the engine (Luna Playworks, Cocos Creator, plain HTML5 / JavaScript) and tells from the file name or the code which ad network a build is for. "Checked before" lists every playable with its latest verdict.
 
-![Шаг 1: загрузка](docs/images/1-upload.png)
+![Step 1: upload](docs/images/1-upload.png)
 
-### 2. Прохождение
+### 2. Playthrough
 
-Кто-то должен один раз пройти плеебл до кнопки установки. Варианты:
+Someone has to play the playable once, up to the install button. The options:
 
-| Способ | Как это выглядит |
+| How | What it looks like |
 | --- | --- |
-| **На телефоне** | На экране появляется QR-код. Наводите камеру телефона — плеебл открывается на весь экран. Телефон должен быть в той же сети Wi-Fi. |
-| **Мышью на компьютере** | Плеебл открывается в окне размером с телефон. |
-| **AI** | Искусственный интеллект сам играет в плеебл, смотрит на экран и замечает поломки. |
-| **Быстрая проверка** | Без прохождения: только проверка, что плеебл загружается и ничего не нарушает. |
+| **On a phone** | A QR code appears. Point the phone camera at it and the playable opens full-screen. The phone must be on the same Wi-Fi. |
+| **With the mouse** | The playable opens in a phone-sized window on this computer. |
+| **AI** | An AI plays it, looks at the screen and notices what is broken. |
+| **Quick check** | No playthrough: only checks that the playable loads and breaks no rules. |
 
-Пока вы играете на телефоне, на компьютере одновременно показываются копии плеебла на экранах других размеров: каждое касание сразу повторяется на всех. Видно, как одно и то же прохождение выглядит на iPhone SE и на iPad.
+While you play on the phone, the computer shows copies of the playable on screens of other sizes, and every touch is repeated on all of them at once. You see how the same playthrough looks on an iPhone SE and on an iPad.
 
-Прохождение делается два раза — вертикально и горизонтально. Если телефон повернуть посреди записи, программа остановит её и попросит пройти этот шаг заново: смешивать ориентации нельзя, иначе результат будет недостоверным.
+The playthrough is done twice: portrait, then landscape. If the phone is rotated in the middle of a recording, PlayGuard stops it and asks to replay that step: mixing orientations would make the result unreliable.
 
-Здесь же можно указать ссылки на ваше приложение в App Store и Google Play — тогда программа проверит, что кнопка установки ведёт именно туда.
+This is also where you enter your app's App Store and Google Play links, so PlayGuard can check that the install button leads exactly there.
 
-![Шаг 2: кто пройдёт плеебл](docs/images/2-playthrough.png)
+![Step 2: who plays it](docs/images/2-playthrough.png)
 
-### 3. Проверка
+### 3. Checks
 
-Программа повторяет записанное прохождение на всех экранах — без телефона и без человека. Касания попадают «в тот же предмет», а не просто в ту же точку: если на узком экране кнопка стоит ниже, программа это учитывает (для движков, где это возможно).
+PlayGuard replays the recorded playthrough on every screen, with no phone and no person. A touch lands "on the same object", not just on the same spot: if the button sits lower on a narrow screen, PlayGuard takes that into account (for engines where that is possible).
 
-Пока идёт проверка, видно, сколько экранов готово и сколько примерно осталось. Можно заниматься другими делами.
+While it runs you see how many screens are done and about how long is left. You can do something else meanwhile.
 
-### 4. Результат
+### 4. Result
 
-Сверху — один итог: **«Готов»**, **«Нужно посмотреть»** или **«Не готов»**. Под ним — ответы обычными словами на простые вопросы:
+On top, one verdict: **Ready**, **Needs a look** or **Not ready**. Under it, plain answers to simple questions:
 
-- Открывает ли кнопка установки магазин?
-- Работает ли без интернета?
-- Помещается ли всё на экран?
-- Не звучит ли реклама раньше времени?
+- Does the install button open the store?
+- Does it work without the internet?
+- Does everything fit on the screen?
+- Is it silent until the player touches it?
 
-Ответы разложены по группам: что нужно исправить, что стоит посмотреть, что не проверялось и что в порядке. У каждого ответа указано, о каких экранах речь.
+The answers are grouped into needs fixing, worth checking, not tested and fine, each with the screens it is about.
 
-## Что именно проверяется
+## What is checked
 
-### На каждом экране
+### On every screen
 
-- **Загружается ли плеебл** вообще.
-- **Нет ли ошибок в коде**, которые ломают игру.
-- **Не пустой ли экран** — бывает, что всё «загрузилось», а на экране одна заливка.
-- **Реагирует ли на касания.**
-- **Кнопка установки**: срабатывает, открывает магазин той платформы (App Store на iPhone, Google Play на Android) и нужное приложение, не срабатывает сама без касания.
-- **Нет ли обращений в интернет**, если сеть их запрещает.
-- **Звук**: тишина до первого касания и тишина, когда реклама скрыта.
-- **Запрещённые возможности браузера**: запрос геолокации, камеры, уведомлений, всплывающие окна — это ошибка; вибрация, буфер обмена, запись данных в браузер — предупреждение, потому что запрещают их не все сети.
-- **Частота кадров** — не тормозит ли игра (зелёная зона 50+ кадров в секунду, жёлтая 30–50, красная ниже 30).
-- **Текст**: не уходит ли за край экрана, не обрезан ли, не слишком ли мелкий.
-- **Переводы**: плеебл открывается с разными языками телефона и сравнивается с английской версией — что не переведено и что перестало помещаться.
+- **It loads** at all.
+- **No code errors** that break the game.
+- **The screen is not blank**: sometimes everything "loads" and the screen is one flat colour.
+- **It reacts to touches.**
+- **The install button** works, opens the store of that platform (App Store on iPhone, Google Play on Android) and the right app, and does not fire by itself without a touch.
+- **No internet requests**, where the network forbids them.
+- **Sound**: silent until the first touch, and silent while the ad is hidden.
+- **Restricted browser features**: asking for location, camera or notifications and pop-up dialogs fail the check; vibration, the clipboard and writing data to the browser are warnings, since only some networks forbid them.
+- **Frame rate**: whether the game stutters (green zone 50+ frames per second, yellow 30–50, red under 30).
+- **Text**: whether it runs off the screen, is cut off or is too small.
+- **Translations**: the playable is opened with different phone languages and compared with the English version: what is not translated and what no longer fits.
 
-### Нагрузочные сценарии
+### Stress scenarios
 
-- **Бездействие** — плеебл оставляют без касаний на 30 секунд (в настройках можно 2 или 5 минут): не должен упасть, погаснуть или сам открыть магазин; заодно видно, не растёт ли расход памяти.
-- **«Обезьянка»** — 40 случайных касаний и свайпов: не сломается ли игра от хаотичных действий.
-- **Поворот** — экран поворачивают и возвращают: картинка должна по-прежнему помещаться.
+- **Idle**: the playable is left untouched for 30 seconds (2 or 5 minutes in Settings). It must not crash, go blank or open the store by itself; memory growth is measured as well.
+- **Monkey**: 40 random taps and swipes, to see whether chaotic input breaks the game.
+- **Rotate**: the screen is turned on its side and back; the picture must still fit.
 
-### Сам файл
+### The file itself
 
-- **Размер** против лимита конкретной сети, и сколько секунд он грузится на медленном 3G и на 4G.
-- **Из чего состоит файл**: доли картинок, звука, кода, и самые тяжёлые элементы списком — первое, что нужно смотреть, если сеть отклонила размер.
-- **Нет ли лишних внешних файлов** и ссылок на чужие приложения.
-- **Обязательные для сети вызовы и теги** в коде.
+- **Size** against the limit of that network, and how many seconds it takes to download on slow 3G and on 4G.
+- **What the file is made of**: shares of images, sound and code, with the heaviest items listed — the first thing to read when a network rejects the size.
+- **No stray external files**, and no links to another app.
+- **Calls and tags the network requires** in the code.
 
-### Экраны
+### Screens
 
-По умолчанию берётся по одному экрану каждой формы — вытянутые телефоны 21:9 и 20:9, обычный 16:9, планшеты 16:10 и 4:3, раскладной телефон — вместо четырёх почти одинаковых телефонов. Экраны iPhone и iPad проверяются на движке Safari, если он установлен. В настройках можно включить и выключить телефоны Android, iPhone, планшеты, раскладные телефоны и ориентации.
+By default PlayGuard takes one screen of each shape — 21:9 and 20:9 tall phones, a regular 16:9 phone, 16:10 and 4:3 tablets, an unfolded foldable — instead of four near-identical phones. iPhone and iPad screens run on Safari's engine when it is installed. Settings turn Android phones, iPhones, tablets, foldables and orientations on and off.
 
-### Рекламные сети
+### Ad networks
 
-У программы есть правила для 27 сетей: AppLovin, Unity Ads, Meta, Mintegral, Google Ads, TikTok / Pangle, ironSource, Vungle, Liftoff, Moloco, Snapchat и других. Для каждой — лимит размера, разрешённый способ открыть магазин и прочие требования. Требования сетей со временем меняются — перед важным релизом их стоит сверить.
+PlayGuard knows the rules of 27 networks: AppLovin, Unity Ads, Meta, Mintegral, Google Ads, TikTok / Pangle, ironSource, Vungle, Liftoff, Moloco, Snapchat and more. For each one: the size limit, the allowed way to open the store, and other requirements. Network requirements change over time, so re-check them before an important release.
 
-Пока плеебл проверяется, программа подменяет то, что сеть добавляет к рекламе в реальности (например, MRAID или `FbPlayableAd`). Поэтому нажатие «Установить» не уходит в настоящий магазин, а записывается и проверяется.
+During a check PlayGuard stands in for what a network adds to the ad in real life (MRAID or `FbPlayableAd`, for example). So pressing Install does not go to the real store: the call is recorded and checked.
 
-## Все сборки под разные сети за один раз
+## Every network's build at once
 
-В разделе **«Сборки»** можно перетащить один архив со сборками под все сети. Программа разберёт его сама, поймёт, какая сборка для какой сети, проверит каждую и покажет таблицу: строка — сеть, столбец — вопрос (размер, упаковка, загрузка, ошибки, картинка, запросы в сеть, кнопка установки).
+In **Builds** you can drop one archive with the builds for all networks. PlayGuard unpacks it, works out which build is for which network, checks each one and shows a table: one row per network, one column per question (size, packaging, loads, errors, picture, network requests, install button).
 
-Чтобы проверить кнопку установки во всех сборках, достаточно пройти **одну** сборку — запись повторится на всех остальных, и для каждой кнопка проверится по правилам её сети.
+To check the install button in every build, play **one** build: the recording is replayed on all the others, and each button is judged by the rules of its own network.
 
-![Сборки под разные сети](docs/images/4-builds.png)
+![Builds for several networks](docs/images/4-builds.png)
 
-## AI-тестировщик
+## AI tester
 
-AI проходит плеебл как человек: смотрит на экран, нажимает, тянет, доходит до кнопки установки — вертикально и горизонтально. По дороге он отмечает, что видит: обрезанный или наложенный интерфейс, растянутую графику, игру, которая не реагирует или которую нельзя пройти, отсутствующую кнопку установки.
+The AI plays the playable like a person: it looks at the screen, taps, drags and gets to the install button, in portrait and in landscape. On the way it notes what it sees: cut-off or overlapping UI, stretched art, a game that does not react or cannot be finished, a missing install button.
 
-Расход денег на AI сведён к минимуму:
+AI spending is kept to a minimum:
 
-- AI играет только на одном экране в каждой ориентации, а на остальных экранах его прохождение просто повторяется без AI.
-- Каждый ход — одна маленькая картинка и несколько строк текста; старые картинки повторно не отправляются.
-- За один ход AI делает до пяти действий, поэтому прохождение — около десяти обращений, а не по одному на каждое касание.
-- Есть общий лимит на всю проверку; потраченное видно прямо во время работы и в отчёте.
+- The AI plays on one screen per orientation; on the other screens its playthrough is simply replayed without the AI.
+- Each turn is one small picture and a few lines of text; earlier pictures are never sent again.
+- The AI makes up to five moves per turn, so a playthrough is about ten calls, not one per tap.
+- There is a cap for the whole check; what was spent is shown live and in the report.
 
-Можно выбрать Claude или GPT (ключ вводится в настройках), а можно режим «случайные касания» — без AI и бесплатно.
+You can pick Claude or GPT (the key is entered in Settings), or "random taps": no AI and free.
 
-## Как отдать результат
+## Handing over the result
 
-Над каждым отчётом есть кнопки «Отдать»:
+Every report has "Hand over" buttons:
 
-| Кому | Что получает |
+| To | What they get |
 | --- | --- |
-| **Менеджеру** | Одна HTML-страница: итог, видео прохождения прямо внутри, цифры и ответы обычными словами. |
-| **Клиенту** | ZIP-архив, который открывается без интернета: видео по ориентациям, картинка последнего кадра каждого экрана, список сетей со статусами и что проверялось. |
-| **Разработчику** | Полный технический отчёт: таблица «экраны × проверки», снимки после касаний, видео, ошибки, запросы в сеть, вызовы рекламных функций. |
+| **Manager** | One HTML page: the verdict, the playthrough video inside it, the numbers and plain answers. |
+| **Client** | A ZIP that opens offline: the video per orientation, the last frame of every screen, the networks with their status, and what was checked. |
+| **Developer** | The full technical report: screens × checks table, screenshots after taps, video, errors, network requests, ad API calls. |
 
-Для архива со сборками есть ещё **«Сводка по релизу»** — одна страница для печати или PDF: все сети против всех вопросов, замечания обычными словами и строки для подписей.
+An archive of builds also gets a **Release summary**: one page to print or save as PDF, with every network against every question, the remarks in plain words, and lines for signatures.
 
-Отчёты пишутся на русском, английском или французском — на языке программы.
+Reports are written in Russian, English or French, in the language of the console.
 
-## Работа в команде
+## Team use
 
-- Программу запускает **один компьютер** в офисе. Остальные открывают ссылку в браузере и ничего не устанавливают — достаточно быть в той же сети Wi-Fi.
-- Каждый при первом входе вводит имя; оно стоит рядом с его проверками в истории.
-- Всё, что касается проверок, доступно каждому. Ключи AI, глубина проверок, установка компонентов и удаление истории — только на том компьютере, где программа запущена.
-- Ключи AI хранятся только на этом компьютере и никогда не попадают на страницу в браузере.
-- В «Настройки → Хранилище» видно, сколько места занимает история, и можно удалить старые проверки. Идущие сейчас проверки не удаляются.
-- Если для проверки нужно что-то скачать (браузер, запись видео, движок Safari), программа заранее говорит, что именно и сколько это весит, и ждёт согласия.
+- **One computer** in the office runs PlayGuard. Everyone else opens a link in the browser and installs nothing; they only need to be on the same Wi-Fi.
+- Everyone enters a name the first time; it is shown next to their checks in the history.
+- Everything about checks is open to everyone. AI keys, the depth of the checks, installing components and deleting history are done only on the computer that runs PlayGuard.
+- AI keys stay on that computer and are never sent to the page in the browser.
+- Settings → Storage shows how much space the history takes and deletes old checks. Running checks are never deleted.
+- When a check needs something downloaded (the browser, the video recorder, Safari's engine), PlayGuard says what and how big beforehand and waits for a yes.
 
-## Запуск
+## Running it
 
-Нужен компьютер Mac или Windows с [Node.js](https://nodejs.org) 20 или новее.
+You need a Mac or a Windows computer with [Node.js](https://nodejs.org) 20 or newer.
 
-- **Mac:** дважды щёлкнуть `PlayGuard.command`.
-- **Windows:** дважды щёлкнуть `PlayGuard.bat`.
-- **Из терминала:**
+- **Mac:** double-click `PlayGuard.command`.
+- **Windows:** double-click `PlayGuard.bat`.
+- **From a terminal:**
 
 ```bash
 npm start
 ```
 
-Откроется браузер с программой (`http://localhost:8787`). Ссылка для коллег показывается в окне запуска и в «Настройки → Команда». Окно запуска не закрывайте — пока оно открыто, программа работает у всей команды.
+The browser opens PlayGuard (`http://localhost:8787`). The link for teammates is shown in the start window and in Settings → Team. Keep the start window open: while it is open, PlayGuard works for the whole team.
 
-**Попробовать без своего файла:** в [`samples/demo`](samples/demo) лежит маленький демо-плеебл и архив сборок для AppLovin, Unity и Meta — там же написано, что с ними делать.
+**Try it without your own file:** [`samples/demo`](samples/demo) holds a small demo playable and an archive of builds for AppLovin, Unity and Meta, with what to do with them.
 
-Если что-то не получается, в программе есть раздел **«Помощь»**: телефон не подключается, что значат итоги, как назвать файлы, чтобы сеть определилась сама, как очистить историю.
+If something does not work, the **Help** section in PlayGuard covers the usual questions: the phone does not connect, what the verdicts mean, how to name files so the network is detected, how to clear the history.
 
-## Из чего состоит проект
+## What the project is made of
 
-| Часть | Что делает |
+| Part | What it does |
 | --- | --- |
-| `apps/lab-console` | Окно программы в браузере — мастер проверки, отчёты, настройки |
-| `apps/hub` | Сервер: принимает файлы, показывает QR, передаёт касания с телефона на все экраны, хранит историю |
-| `apps/playwright-runner` | Повторяет прохождение на всех экранах в настоящем браузере, запускает проверки и AI, пишет отчёт |
-| `apps/mobile` | Необязательное приложение-сканер для телефона (хватает и обычной камеры) |
-| `samples/demo` | Демо-плеебл и сборки для первого знакомства |
-| `packages/*` | Общие части: список устройств, правила сетей, проверки, запись прохождения, пересчёт касаний под размер экрана |
-| `traces/` | Записанные прохождения |
-| `reports/` | Готовые отчёты |
-| `batches/` | Загруженные архивы со сборками |
+| `apps/lab-console` | The PlayGuard window in the browser: the check wizard, reports, settings |
+| `apps/hub` | The server: receives files, shows the QR, sends phone touches to every screen, keeps the history |
+| `apps/playwright-runner` | Replays the playthrough on every screen in a real browser, runs the checks and the AI, writes the report |
+| `apps/mobile` | Optional scanner app for the phone (the regular camera is enough) |
+| `samples/demo` | Demo playable and builds for a first try |
+| `packages/*` | Shared parts: the device list, network rules, checks, recording, mapping touches to each screen size |
+| `traces/` | Recorded playthroughs |
+| `reports/` | Finished reports |
+| `batches/` | Uploaded archives of builds |
 
-Что менялось от версии к версии — в [CHANGELOG.md](CHANGELOG.md). Нашли ошибку или есть идея — создайте задачу на GitHub (Issues → New issue), там готовые шаблоны.
+What changed from version to version is in [CHANGELOG.md](CHANGELOG.md). Found a bug or have an idea? Open an issue on GitHub (Issues → New issue); the templates are ready.
 
-Подробности для разработчиков — команды, параметры, устройство синхронизации и все проверки — в [docs/TECHNICAL.md](docs/TECHNICAL.md).
+Details for developers — commands, options, how the live sync works and every check — are in [docs/TECHNICAL.md](docs/TECHNICAL.md).

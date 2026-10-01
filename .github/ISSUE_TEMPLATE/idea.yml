@@ -1,24 +1,24 @@
-name: Идея или новая проверка
-description: Новая рекламная сеть, проверка, экран или удобство
+name: Idea or new check
+description: A new ad network, check, screen or convenience
 labels: [enhancement]
 body:
   - type: dropdown
     id: kind
     attributes:
-      label: Что предлагаете
+      label: What are you suggesting
       options:
-        - Новая рекламная сеть
-        - Новая проверка
-        - Новое устройство или экран
-        - Удобство в программе
-        - Отчёт
-        - Другое
+        - New ad network
+        - New check
+        - New device or screen
+        - Convenience in the console
+        - Report
+        - Other
     validations:
       required: true
   - type: textarea
     id: idea
     attributes:
-      label: Что нужно и зачем
-      description: Какую проблему это решит. Для сети — ссылка на её требования к плееблам.
+      label: What is needed and why
+      description: Which problem it solves. For a network, a link to its playable requirements.
     validations:
       required: true

@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Как начать
-    url: https://github.com/Micky-52Entertainment/Playable-Testing-Automatisation/blob/main/КАК-НАЧАТЬ.md
-    about: Запуск программы и первая проверка
+  - name: Getting started
+    url: https://github.com/Micky-52Entertainment/Playable-Testing-Automatisation/blob/main/README.md#running-it
+    about: Starting PlayGuard and a first check

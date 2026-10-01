@@ -17,14 +17,14 @@ const DEMO = path.join(ROOT, "samples/demo");
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
 await context.addInitScript(() => {
-  localStorage.setItem("playable-lab.lang", "ru");
+  localStorage.setItem("playable-lab.lang", "en");
   localStorage.setItem("playable-lab.tour-seen", "1");
-  localStorage.setItem("playable-lab.name", "Демо");
+  localStorage.setItem("playable-lab.name", "Demo");
 });
 const page = await context.newPage();
 const shot = (name: string) => page.screenshot({ path: path.join(OUT, `${name}.png`) });
 const later = async () => {
-  const button = page.getByRole("button", { name: /^(Позже|Не сейчас|Пропустить)$/ });
+  const button = page.getByRole("button", { name: /^(Later|Not now|Skip)$/ });
   if (await button.first().isVisible().catch(() => false)) {
     await button.first().click();
   }
@@ -40,21 +40,21 @@ const pick = async (button: string, file: string) => {
   await chooser.setFiles(file);
 };
 
-await pick("Выбрать файлы", path.join(DEMO, "builds/applovin/index.html"));
+await pick("Choose files", path.join(DEMO, "builds/applovin/index.html"));
 await page.getByPlaceholder(/play\.google\.com/).fill("com.example.demo");
 await page.waitForTimeout(1500);
 await page.screenshot({ path: path.join(OUT, "2-playthrough.png"), fullPage: true });
 
-await page.getByRole("button", { name: "Быстрая проверка", exact: true }).click();
+await page.getByRole("button", { name: "Quick check", exact: true }).click();
 await page.locator(".hero").waitFor({ timeout: 300000 });
 await page.frameLocator(".report-frame").locator(".glances").waitFor();
 await page.waitForTimeout(1500);
 await shot("3-result");
 
-await page.getByRole("button", { name: "Сборки", exact: true }).click();
+await page.getByRole("button", { name: "Builds", exact: true }).click();
 await page.waitForTimeout(800);
 await later();
-await pick("Загрузить файлы", path.join(DEMO, "demo-builds.zip"));
+await pick("Upload files", path.join(DEMO, "demo-builds.zip"));
 await page.waitForTimeout(3000);
 await page.locator("table").first().waitFor({ timeout: 300000 });
 for (let i = 0; i < 150; i += 1) {
