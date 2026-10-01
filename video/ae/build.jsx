@@ -611,6 +611,8 @@ function historyList(t0, t1) {
   K(S(wall), [[t0, [92, 92]], [b, [104, 104]]], 0);
   K(P(wall), [[t0, [W / 2 + 1400, H / 2 - 40]], [t0 + 0.45, [W / 2, H / 2 - 40]], [b, [W / 2, H / 2 - 40]], [b + 0.4, [W / 2 - 1400, H / 2 - 40]]], 85);
   wall.motionBlur = true; sfx("whoosh", t0, -14);
+  // the wall's flat navy melts into the gradient background
+  wall.blendingMode = BlendingMode.LIGHTEN;
   var items = ["File size", "Format", "Install button", "Errors", "FPS", "Sound"];
   for (var i = 0; i < 6; i++) {
     var at = b + i * 0.5, x = 540 + (i % 3) * 420, y = 430 + Math.floor(i / 3) * 170;
