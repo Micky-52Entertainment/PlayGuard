@@ -1,47 +1,47 @@
-name: Нашёл ошибку
-description: Программа сработала не так, как ожидалось
+name: Bug report
+description: PlayGuard did not do what you expected
 labels: [bug]
 body:
   - type: textarea
     id: what
     attributes:
-      label: Что случилось
-      description: Что вы делали и что увидели. Скриншот очень помогает.
+      label: What happened
+      description: What you did and what you saw. A screenshot helps a lot.
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Что ожидали
+      label: What you expected
     validations:
       required: true
   - type: input
     id: playable
     attributes:
-      label: Плеебл и рекламная сеть
-      placeholder: например, game_applovin.html, AppLovin
+      label: Playable and ad network
+      placeholder: e.g. game_applovin.html, AppLovin
   - type: dropdown
     id: step
     attributes:
-      label: На каком шаге
+      label: At which step
       options:
-        - Загрузка
-        - Прохождение на телефоне
-        - Прохождение мышью
-        - AI-тестировщик
-        - Проверка
-        - Результат и отчёт
-        - Сборки
-        - Настройки
-        - Запуск программы
-        - Другое
+        - Upload
+        - Playthrough on a phone
+        - Playthrough with the mouse
+        - AI tester
+        - Checks
+        - Result and report
+        - Builds
+        - Settings
+        - Starting PlayGuard
+        - Other
   - type: textarea
     id: report
     attributes:
-      label: Отчёт
-      description: Если проверка дошла до конца — приложите отчёт «Разработчику» или укажите папку из reports/.
+      label: Report
+      description: If the check finished, attach the "Developer" report or name its folder in reports/.
   - type: input
     id: computer
     attributes:
-      label: Компьютер и браузер
-      placeholder: например, macOS 15, Chrome 140
+      label: Computer and browser
+      placeholder: e.g. macOS 15, Chrome 140

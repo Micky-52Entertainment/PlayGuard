@@ -1,22 +1,22 @@
-# Что нового
+# Changelog
 
-## Готовится
+## Unreleased
 
-- README с подробным объяснением программы и скриншотами; техническое описание перенесено в `docs/TECHNICAL.md`.
-- Демо-плеебл и архив сборок для трёх сетей в `samples/demo/`.
-- Шаблоны для сообщений об ошибках и идей на GitHub.
-- Автоматическая проверка тестов на GitHub при каждом изменении.
+- README explaining what PlayGuard does, with screenshots; the technical description moved to `docs/TECHNICAL.md`.
+- Demo playable and an archive of builds for three networks in `samples/demo/`.
+- GitHub templates for bug reports, ideas and pull requests.
+- GitHub check that runs the typecheck and the tests on every change.
 
-## 1.0 — 1 октября 2026
+## 1.0 — 1 October 2026
 
-Первая версия для команды под именем PlayGuard.
+First version for the team, under the name PlayGuard.
 
-- Проверка в четыре шага: загрузка, прохождение (телефон, мышь, AI или без прохождения), проверка на всех экранах, итог «Готов / Нужно посмотреть / Не готов».
-- Правила 27 рекламных сетей: размер, кнопка установки, запросы в интернет, обязательные вызовы.
-- Проверка звука, памяти, частоты кадров, текста, переводов и запрещённых возможностей браузера; сценарии бездействия, случайных касаний и поворота.
-- Экраны iPhone и iPad на движке Safari.
-- Проверка всех сборок под разные сети одним архивом.
-- AI-тестировщик на Claude или GPT с экономией токенов.
-- Результат для менеджера, клиента и разработчика; сводка по релизу для печати.
-- Работа всей командой с одного компьютера, без установки у коллег.
-- Интерфейс и отчёты на русском, английском и французском.
+- A check in four steps: upload, playthrough (phone, mouse, AI or none), checks on every screen, verdict "Ready / Needs a look / Not ready".
+- Rules of 27 ad networks: size, install button, internet requests, required calls.
+- Checks for sound, memory, frame rate, text, translations and restricted browser features; idle, random-tap and rotate scenarios.
+- iPhone and iPad screens on Safari's engine.
+- Every network's build checked from one archive.
+- AI tester on Claude or GPT, with low token spend.
+- Results for a manager, a client and a developer; a printable release summary.
+- The whole team works from one computer, with nothing to install for teammates.
+- Interface and reports in Russian, English and French.

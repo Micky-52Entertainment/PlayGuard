@@ -1,8 +1,8 @@
-## Что изменилось
+## What changed
 
-## Как проверено
+## How it was checked
 
 - [ ] `npm test`
 - [ ] `npm run typecheck`
-- [ ] `npm run test:site` (если менялся интерфейс)
-- [ ] Новые тексты интерфейса есть на всех языках в `apps/lab-console/src/i18n.tsx`
+- [ ] `npm run test:site` (if the interface changed)
+- [ ] New interface texts exist in every language in `apps/lab-console/src/i18n.tsx`
