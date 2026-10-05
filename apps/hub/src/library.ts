@@ -39,6 +39,8 @@ export interface JobState {
   /** Every screen of the run, with the ones done so far. */
   screens?: ScreenTile[];
   error?: string;
+  /** The folder the run writes into: a failed run may be continued from it. */
+  dir?: string;
 }
 
 export interface TraceSummary {
@@ -59,6 +61,8 @@ export interface TraceSummary {
   by: string | null;
   report: ReportSummary | null;
   job: JobState | null;
+  /** Its latest check stopped half-way and can be continued. */
+  interrupted?: { dir: string; done: number; total: number | null };
 }
 
 interface CachedTrace {
@@ -308,6 +312,9 @@ export class Library {
         if (update.progress) {
           job.progress = update.progress;
         }
+        if (update.dir) {
+          job.dir = update.dir;
+        }
         job.screens = applyScreens(job.screens, update);
       },
     }).then((result) => {
@@ -319,6 +326,7 @@ export class Library {
       this._jobs.set(traceId, {
         state: "failed",
         startedAt: job.startedAt,
+        dir: result.dir || undefined,
         error: lastLine(result.output) || `Runner exited with code ${result.code}`,
       });
     });

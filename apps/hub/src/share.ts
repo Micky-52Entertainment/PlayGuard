@@ -75,12 +75,11 @@ export class Sharing {
   private readonly _file: string;
 
   public constructor(
-    root: string,
     dataDir: string,
     private readonly _reportsDir: string,
     private readonly _brief: (dir: string, lang: string) => Promise<string>
   ) {
-    this._bin = path.join(root, ".playable-lab", "bin", process.platform === "win32" ? "cloudflared.exe" : "cloudflared");
+    this._bin = path.join(dataDir, ".playable-lab", "bin", process.platform === "win32" ? "cloudflared.exe" : "cloudflared");
     this._file = path.join(dataDir, ".playable-lab", "shares.json");
     this._tool = existsSync(this._bin) ? "ready" : "missing";
   }

@@ -9,7 +9,7 @@ import { Hint } from "./Hint";
 import { ConfirmDialog } from "./Dialogs";
 import { DEVICE_CATALOG, FORMAT_SET, platformOf } from "@playable-lab/device-catalog";
 import { LANGS, useI18n } from "./i18n";
-import { install, installState, onInstallChange } from "./install";
+import { desktopApp, install, installState, onInstallChange } from "./install";
 import type { InstallState } from "./install";
 import { chime, finishSoundOn, mascotHidden, setFinishSound, setMascotHidden } from "./mascotBus";
 import { getName, setName } from "./identity";
@@ -231,6 +231,21 @@ const AppSection = () => {
   const [state, setState] = useState<InstallState>(installState);
   useEffect(() => onInstallChange(() => setState(installState())), []);
   const safari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+  const desktop = desktopApp();
+  if (desktop) {
+    return (
+      <section className="app-install">
+        <h2>{t("app.install.title")}</h2>
+        <div className="app-install-row">
+          <img src="/icon-192.png" alt="" width={56} height={56} />
+          <div>
+            <p className="hint">{t("app.desktop.version", { version: desktop.version })}</p>
+            <button onClick={() => void desktop.checkForUpdates()}>{t("app.desktop.update")}</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="app-install">
       <h2>{t("app.install.title")}</h2>

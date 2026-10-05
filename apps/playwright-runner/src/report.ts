@@ -100,7 +100,7 @@ export interface RunReport {
 /** The PlayGuard logo inside the page, so a report stays one folder that opens anywhere. */
 const LOGO_URI = (() => {
   try {
-    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+    const root = process.env.PLAYGUARD_ROOT ? path.resolve(process.env.PLAYGUARD_ROOT) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
     return `data:image/png;base64,${readFileSync(path.join(root, "apps/lab-console/public/favicon.png")).toString("base64")}`;
   } catch {
     return "";

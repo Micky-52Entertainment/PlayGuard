@@ -6,9 +6,12 @@ export const PLAYABLE_BRIDGE_SOURCE = String.raw`
   window.__playableLabBridge = true;
 
   var params = new URLSearchParams(location.search);
+  // Played with the mouse on the computer: the source, but without sound.
+  var playedOnPc = window.name === "playable_source_pc";
   var isSource = window.__playableLabIsSource === true ||
     params.get("source") === "1" ||
-    window.name === "playable_source";
+    window.name === "playable_source" ||
+    playedOnPc;
   var downAt = {};
   var lastTapAt = 0;
   var lastTapNx = 0;
@@ -30,15 +33,20 @@ export const PLAYABLE_BRIDGE_SOURCE = String.raw`
   // Further behind than that, reacting at once matters more than the clock.
   var MAX_SYNC_LAG = 120;
 
-  // Only the phone makes sound: a wall of mirrors playing the same track is noise.
-  // The runner keeps it: its browser is muted anyway, and it measures the sound.
-  if (!isSource && !window.__playableLabKeepSound) {
+  // Only the phone makes sound: a wall of mirrors playing the same track is noise,
+  // and on the computer nobody needs to hear it while playing with the mouse.
+  // The runner keeps it: it measures the sound and silences the output itself.
+  if ((!isSource || playedOnPc) && !window.__playableLabKeepSound) {
     try {
       var mediaPlay = HTMLMediaElement.prototype.play;
       HTMLMediaElement.prototype.play = function () {
         this.muted = true;
         return mediaPlay.apply(this, arguments);
       };
+      // Elements that start by the autoplay attribute never call play().
+      document.addEventListener("play", function (event) {
+        if (event.target instanceof HTMLMediaElement) event.target.muted = true;
+      }, true);
     } catch (_) {}
     try {
       var nodeConnect = AudioNode.prototype.connect;
@@ -198,8 +206,15 @@ export const PLAYABLE_BRIDGE_SOURCE = String.raw`
       dpr: window.devicePixelRatio || 1,
       orientation: size.w > size.h ? "landscape" : "portrait",
       fit: "stretch",
-      contentRect: content
+      contentRect: content,
+      os: phoneOs()
     };
+  }
+
+  function phoneOs() {
+    var ua = navigator.userAgent || "";
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
+    return /Android/.test(ua) ? "android" : "other";
   }
 
   function toNorm(clientX, clientY) {
@@ -317,7 +332,7 @@ export const PLAYABLE_BRIDGE_SOURCE = String.raw`
     var U = window.UnityEngine;
     if (!U || !U.Camera || !U.Screen || !U.Vector3 || !U.Vector3.ctor) return null;
     var cam = U.Camera.main;
-    if (!cam || !cam.ScreenPointToRay || !cam.WorldToScreenPoint) return null;
+    if (!cam || !cam.WorldToScreenPoint || !(cam.ScreenPointToRay || cam.ScreenToWorldPoint)) return null;
     var canvas = document.getElementById("application-canvas") || document.querySelector("canvas");
     if (!canvas) return null;
     var r = canvas.getBoundingClientRect();
@@ -359,6 +374,17 @@ export const PLAYABLE_BRIDGE_SOURCE = String.raw`
     return z;
   }
 
+  // Some Luna builds leave Camera.ScreenPointToRay out; two points on the same
+  // screen spot at different depths give the same ray.
+  function screenRay(api, sx, sy) {
+    var V3 = api.U.Vector3;
+    if (api.cam.ScreenPointToRay) return api.cam.ScreenPointToRay(new V3.ctor(sx, sy, 0));
+    var a = api.cam.ScreenToWorldPoint(new V3.ctor(sx, sy, 1));
+    var b = api.cam.ScreenToWorldPoint(new V3.ctor(sx, sy, 2));
+    if (!a || !b) return null;
+    return { origin: a, direction: { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z } };
+  }
+
   function unityNames(transform) {
     var parts = [];
     while (transform) {
@@ -371,6 +397,21 @@ export const PLAYABLE_BRIDGE_SOURCE = String.raw`
   function canvasCamera(graphic) {
     var canvas = graphic.canvas;
     return canvas && canvas.renderMode !== 0 && canvas.worldCamera ? canvas.worldCamera : null;
+  }
+
+  // A raycast target over the whole screen is a blocker or an effect layer (a
+  // flash, a fade), not a control: anchoring to it says nothing about the scene.
+  function coversScreen(api, graphic, rt) {
+    try {
+      var U = api.U;
+      var r = rt.rect;
+      var cam = canvasCamera(graphic);
+      var a = U.RectTransformUtility.WorldToScreenPoint(cam, rt["TransformPoint$1"](new U.Vector3.ctor(r.x, r.y, 0)));
+      var b = U.RectTransformUtility.WorldToScreenPoint(cam, rt["TransformPoint$1"](new U.Vector3.ctor(r.x + r.width, r.y + r.height, 0)));
+      return Math.abs(b.x - a.x) >= U.Screen.width * 0.9 && Math.abs(b.y - a.y) >= U.Screen.height * 0.9;
+    } catch (_) {
+      return false;
+    }
   }
 
   function unityUiAnchor(api, sx, sy) {
@@ -390,7 +431,7 @@ export const PLAYABLE_BRIDGE_SOURCE = String.raw`
       var rect = rt.rect;
       if (ref.v.x < rect.x || ref.v.x > rect.x + rect.width || ref.v.y < rect.y || ref.v.y > rect.y + rect.height) continue;
       var area = rect.width * rect.height;
-      if (area <= bestArea) {
+      if (area <= bestArea && !coversScreen(api, g, rt)) {
         bestArea = area;
         best = { engine: "unity", path: unityNames(rt), x: Math.round(ref.v.x * 100) / 100, y: Math.round(ref.v.y * 100) / 100 };
       }
@@ -405,7 +446,8 @@ export const PLAYABLE_BRIDGE_SOURCE = String.raw`
     var sy = api.sh - (clientY - api.top) * api.ky;
     var ui = unityUiAnchor(api, sx, sy);
     if (ui) return ui;
-    var ray = api.cam.ScreenPointToRay(new api.U.Vector3.ctor(sx, sy, 0));
+    var ray = screenRay(api, sx, sy);
+    if (!ray) return undefined;
     var o = ray.origin;
     var d = ray.direction;
     if (!o || !d || Math.abs(d.z) < 1e-6) return undefined;

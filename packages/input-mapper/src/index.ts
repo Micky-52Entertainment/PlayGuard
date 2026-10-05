@@ -31,6 +31,10 @@ export const deviceCssSize = (
   device: DeviceProfile,
   orientation: Orientation
 ): { cssWidth: number; cssHeight: number } => {
+  const exact = device.sizes?.[orientation];
+  if (exact) {
+    return { cssWidth: exact.w, cssHeight: exact.h };
+  }
   const shortSide = Math.min(device.width, device.height);
   const longSide = Math.max(device.width, device.height);
   return orientation === "portrait"

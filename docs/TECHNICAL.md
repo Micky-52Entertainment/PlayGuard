@@ -302,6 +302,72 @@ The injected mock stands in for what networks add at serve time: `mraid`,
 `playableSDK`, `parent.postMessage('download')` and `window.open`. Calls are
 recorded as `adEvents` in the trace instead of leaving the page.
 
+## Interrupted checks
+
+The runner writes `run.json` (`argv`, `startedAt`, `name`, planned `total`)
+into the report folder as soon as it starts, prints `@@dir <folder>`, and
+saves each finished screen's result as `<screen>/result.json`. A folder with
+`run.json` but no `report.json`, that no runner of this hub is writing, is an
+interrupted check (`GET /api/interrupted`). `--resume <folder>` (added to the
+saved `argv`) loads the saved screens, deletes what a screen left half done,
+checks the rest and writes the report into the same folder; language runs are
+compared again with the saved ones. `POST /api/interrupted/:dir/resume`
+starts that as a run (`/api/runs/:id`); `DELETE /api/interrupted/:dir`
+(this computer only) drops it. An archive's builds remember their folder
+(`runDir`), and `POST /api/batches/:id/resume` continues only the
+interrupted ones. AI checks are not continued: they start again.
+
+## Desktop app
+
+`apps/desktop` packs the same hub and console into an installed app (Electron):
+a `.dmg` per Mac chip and an NSIS installer for Windows. It is not a
+workspace: it has its own `package.json` and lock, so `npm ci` at the root
+does not download Electron.
+
+```bash
+cd apps/desktop
+npm install
+npm start        # bundle and open the app from stage/ (uses Playwright's usual browser cache)
+npm run dist     # bundle, download the browsers, build the installer into release/
+```
+
+- `scripts/bundle.mjs` builds `stage/`, the folder that becomes the app: the
+  hub and the runner bundled by esbuild into `out/hub.mjs` and
+  `out/runner.mjs` (Playwright stays a real package in `node_modules`), the
+  built console, and the files the hub reads, at their repo paths.
+- `scripts/fetch-browsers.mjs` downloads Chromium, WebKit and ffmpeg into
+  `browsers/`, shipped as `Resources/browsers`. They are per platform and
+  chip, so each installer is built on its own kind of machine.
+- `src/main.ts` starts the hub in a utility process and loads
+  `http://localhost:8787/` in the window (the hub's local-only endpoints check
+  for a localhost origin). Closing the window hides it; the hub keeps serving
+  phones and teammates until Quit in the tray / menu bar, which stops the hub
+  and the runners it started. A second launch focuses the window; if another
+  hub already answers on the port, the app asks to close it.
+- `src/updater.ts`: electron-updater against GitHub Releases. Windows
+  downloads and installs on quit; the unsigned Mac app only announces the
+  version and opens the release page (macOS installs updates into signed apps
+  only).
+
+The hub and runner learn they are inside the app from these variables (unset
+in a checkout, where nothing changes):
+
+| Variable | Meaning |
+| --- | --- |
+| `PLAYGUARD_DESKTOP=1` | `/api/meta` reports `desktop: true`; the console hides the browser install and the service worker |
+| `PLAYGUARD_ROOT` | Where the console build, the favicon and `samples/` are (instead of the repo root) |
+| `PLAYGUARD_DATA` | The user's data folder (`userData`) |
+| `PLAYGUARD_RUNNER_JS`, `PLAYGUARD_NODE` | Run the built runner, and Playwright's installer, on the app binary with `ELECTRON_RUN_AS_NODE=1` instead of `tsx` |
+| `PLAYWRIGHT_BROWSERS_PATH` | The browsers inside the app |
+| `PLAYGUARD_SMOKE=1` | Start, check `/api/meta` and `/api/health`, print them and exit 0 / 1 (used by CI) |
+
+**Release:** set `version` in `apps/desktop/package.json`, then push the tag
+`v<version>`. `.github/workflows/release.yml` builds and smoke-tests the app
+on macOS (arm64 and Intel) and Windows and uploads the installers into a draft
+release; publishing the draft makes installed apps see the update. Signing is
+off (`mac.identity: null`); to turn it on, add the certificate secrets
+listed in `electron-builder.yml`.
+
 ## Development
 
 ```bash
@@ -352,6 +418,28 @@ each screen (mirror or replay) resolves it in its own layout:
 
 Anything else falls back to the fraction of the screen, and the console says
 so under the mirror ("taps approximate").
+
+**In the replay** (`apps/playwright-runner/src/locate.ts`), the recording phone
+itself is the first screen: **Your phone**, at the exact CSS size, pixel
+ratio and engine (WebKit for an iPhone) the trace was recorded with. Its touches
+land where the player's did. Just before each finger lands it keeps a picture of
+the screen. Every other screen takes a picture at the same moment of its own
+playthrough and places the finger, in this order:
+
+1. the **scene anchor**, when the engine is reachable (exact on any shape);
+2. the **picture**: the neighbourhood of the touch on the recording phone is
+   looked for on this screen at every size the game could be drawn at
+   (normalised cross-correlation, coarse then fine). The spot found is the
+   touch, and the size found is the game's scale on this screen;
+3. the **layout**: the scale and offset fitted (least squares) to the touches
+   found so far, else the fit of the first picture (stretch, fit width or fit
+   height);
+4. the fraction of the game area.
+
+After landing, a finger travels the distance it travelled on the phone, times
+that scale. Each screen's report notes which method placed its touches
+(`touches placed by: picture 12, layout (fit-height) 1`). `--no-own-phone`
+turns the reference screen off (and with it the picture and layout steps).
 
 The console adds a **phone replica** mirror with the phone's exact viewport:
 that one is a true copy. Other screens receive the same normalised gesture,

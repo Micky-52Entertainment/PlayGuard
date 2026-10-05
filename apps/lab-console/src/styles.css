@@ -871,6 +871,14 @@ button.primary.pulse { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35); }
 .dropzone .hint { font-size: 13px; max-width: 52ch; }
 .dropzone-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 14px; }
 
+.interrupted { margin-top: 28px; padding: 12px 16px; border: 1px solid var(--warn-line); border-radius: 12px; background: var(--soft-warn-bg); }
+.interrupted h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--warn-fg); }
+.interrupted ul { margin: 0; padding: 0; list-style: none; }
+.interrupted-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.interrupted-row + .interrupted-row { border-top: 1px solid var(--warn-line); }
+.interrupted-name { display: flex; flex-direction: column; gap: 2px; margin-right: auto; min-width: 0; }
+.interrupted-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 560px) { .interrupted-row { flex-wrap: wrap; } .interrupted-name { flex-basis: 100%; } }
 .history { margin-top: 36px; }
 .history h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
 .history ul, .history ol { margin: 0; padding: 0; list-style: none; }

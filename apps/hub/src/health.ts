@@ -88,11 +88,18 @@ export class Health {
       return false;
     }
     this._install = { state: "running" };
-    const child = spawn(
-      path.join(this._root, "node_modules/.bin/playwright"),
-      ["install", ...missing.map((item) => PACKAGE[item])],
-      { cwd: this._root, shell: process.platform === "win32" }
-    );
+    const packages = missing.map((item) => PACKAGE[item]);
+    const child = process.env.PLAYGUARD_RUNNER_JS
+      ? // The installed app has no npm scripts: run Playwright's own command line on the app's Node.
+        spawn(
+          process.env.PLAYGUARD_NODE || process.execPath,
+          [path.join(path.dirname(this._require().resolve("playwright/package.json")), "cli.js"), "install", ...packages],
+          { cwd: this._root, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } }
+        )
+      : spawn(path.join(this._root, "node_modules/.bin/playwright"), ["install", ...packages], {
+          cwd: this._root,
+          shell: process.platform === "win32",
+        });
     let tail = "";
     const collect = (chunk: Buffer): void => {
       const text = chunk.toString();
@@ -120,9 +127,14 @@ export class Health {
     return true;
   }
 
+  /** Playwright belongs to the runner: resolve it from there. */
+  private _require(): NodeRequire {
+    return createRequire(path.join(this._root, "apps/playwright-runner/package.json"));
+  }
+
   private _webkit(): boolean {
     try {
-      const require = createRequire(path.join(this._root, "apps/playwright-runner/package.json"));
+      const require = this._require();
       return existsSync((require("playwright") as { webkit: { executablePath(): string } }).webkit.executablePath());
     } catch {
       return false;
@@ -131,8 +143,8 @@ export class Health {
 
   private _bundledChromium(): { installed: boolean; browsersDir: string | null } {
     try {
-      // Playwright belongs to the runner; ask it from there where its browser lives.
-      const require = createRequire(path.join(this._root, "apps/playwright-runner/package.json"));
+      // Ask Playwright where its browser lives.
+      const require = this._require();
       const executable = (require("playwright") as { chromium: { executablePath(): string } }).chromium.executablePath();
       let dir = path.dirname(executable);
       while (dir !== path.dirname(dir) && !/^chromium[-_]/.test(path.basename(dir))) {

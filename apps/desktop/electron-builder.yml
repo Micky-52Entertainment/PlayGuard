@@ -1,0 +1,65 @@
+# Installers for PlayGuard. `npm run dist` (in apps/desktop) builds them for this
+# computer; .github/workflows/release.yml builds all of them on a v* tag.
+appId: com.studioadept.playguard
+productName: PlayGuard
+copyright: Copyright © 2026 Studio Adept
+
+directories:
+  app: stage
+  output: release
+  buildResources: resources
+
+# The runner and Playwright are started as separate processes from these files:
+# keep them as plain files rather than inside an archive.
+asar: false
+npmRebuild: false
+files:
+  - "**/*"
+extraResources:
+  - from: browsers
+    to: browsers
+
+artifactName: "${productName}-${version}-${os}-${arch}.${ext}"
+
+mac:
+  category: public.app-category.developer-tools
+  icon: resources/icon.png
+  target:
+    - dmg
+    - zip
+  # Not signed with a certificate yet: signed ad hoc, so macOS shows a downloaded
+  # copy as "from an unidentified developer" (Open Anyway) rather than "damaged".
+  # To sign and notarize, set CSC_LINK / CSC_KEY_PASSWORD and APPLE_ID /
+  # APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID, and remove these two lines.
+  identity: "-"
+  hardenedRuntime: false
+  extendInfo:
+    NSLocalNetworkUsageDescription: PlayGuard shows playables on phones in the same Wi-Fi and lets teammates open checks from this computer.
+
+dmg:
+  title: "${productName} ${version}"
+
+win:
+  icon: resources/icon.png
+  target:
+    - nsis
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: PlayGuard
+  # The data folder (%APPDATA%\PlayGuard) stays after uninstall: reports are the team's.
+  deleteAppDataOnUninstall: false
+  installerLanguages:
+    - en_US
+    - ru_RU
+  multiLanguageInstaller: true
+
+publish:
+  provider: github
+  owner: Micky-52Entertainment
+  repo: PlayGuard
+  releaseType: draft

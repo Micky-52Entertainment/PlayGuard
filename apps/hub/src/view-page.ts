@@ -106,7 +106,7 @@ export const renderViewPage = (params: {
     params.role === "source" && !params.desktop
       ? `<iframe id="playable" name="playable_source" data-src="${params.playableSrc}" allow="autoplay; fullscreen"></iframe>
   <div id="start">${LOGO_URI ? `<img src="${LOGO_URI}" alt="PlayGuard" width="64" height="64" />` : ""}<p id="done" hidden></p><span id="turn" class="${params.orientationLock}" hidden aria-hidden="true"></span><button id="go" type="button">${PHONE_TEXT[params.lang || "en"].start}</button><p id="note"></p></div>`
-      : `<iframe id="playable" name="${params.role === "source" ? "playable_source" : "playable_slave"}" src="${params.playableSrc}" allow="autoplay; fullscreen"></iframe>`
+      : `<iframe id="playable" name="${params.role === "source" ? (params.desktop ? "playable_source_pc" : "playable_source") : "playable_slave"}" src="${params.playableSrc}" allow="autoplay; fullscreen"></iframe>`
   }
   <div id="abort"><h1>${PHONE_TEXT[params.lang || "en"].abortTitle}</h1><p id="reason"></p></div>
   <script>

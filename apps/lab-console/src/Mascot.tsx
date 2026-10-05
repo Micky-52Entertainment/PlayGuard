@@ -3,7 +3,7 @@ import { useI18n } from "./i18n";
 import type { Key } from "./i18n";
 import { mascotHidden, onMascotSay, setMascotHidden } from "./mascotBus";
 import type { MascotLine, Pose } from "./mascotBus";
-import { EffectArt, scenesOnScreen } from "./MickeyArt";
+import { EffectArt, MickeyPicture, scenesOnScreen } from "./MickeyArt";
 
 const TIPS = 6;
 /** Quiet for this long on the same screen, and Micky suggests the next step. */
@@ -286,11 +286,9 @@ export const Mascot = ({ base, hint, guide, explain, actions, ask, onOpenHelp }:
           setOpen((value) => !value);
         }}
       >
-        <img
+        <MickeyPicture
           key={peek ? "peek" : current.pose === "walk" ? "walk" : current.pose}
           src={peek ? "/mascot/peek.webp" : pictureOf(current.pose, step)}
-          alt=""
-          draggable={false}
         />
         {sleeping && !peek && <EffectArt effect="zzz" />}
       </button>
@@ -310,8 +308,14 @@ export const Mascot = ({ base, hint, guide, explain, actions, ask, onOpenHelp }:
   );
 };
 
+/** Kept so the browser keeps them decoded. */
+const preloaded: HTMLImageElement[] = [];
+
 /** Every picture loaded once up front, so a change of pose never blinks. */
 export const preloadMascot = (): void => {
+  if (preloaded.length > 0) {
+    return;
+  }
   [
     "idle", "talk", "laugh", "cheer", "wave", "ready", "sad", "think", "wink", "thumbs", "point", "shrug", "walk1", "walk2", "jump", "arms",
     "sleep", "phone", "magnify", "laptop", "run", "facepalm", "idea", "celebrate", "scared", "bye", "checklist", "tired", "peek", "ok", "trophy", "sweat",
@@ -319,6 +323,7 @@ export const preloadMascot = (): void => {
     (name) => {
       const image = new Image();
       image.src = `/mascot/${name}.webp`;
+      preloaded.push(image);
     }
   );
 };

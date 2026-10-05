@@ -99,6 +99,10 @@ export interface QuickRun {
   tokens: { used: number; limit: number; calls: number } | null;
   lastLine: string | null;
   reportDir: string | null;
+  /** The folder the run writes into: an interrupted run is continued from it. */
+  dir: string | null;
+  /** Continues a check that was interrupted. */
+  resumed?: boolean;
   verdict: "pass" | "warn" | "fail" | null;
   error?: string;
 }

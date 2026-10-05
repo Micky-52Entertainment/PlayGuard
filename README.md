@@ -1,13 +1,23 @@
 # PlayGuard
 
+[![Download](https://img.shields.io/github/v/release/Micky-52Entertainment/PlayGuard?label=Download&color=2ea44f)](https://github.com/Micky-52Entertainment/PlayGuard/releases/latest)
+[![macOS · Windows](https://img.shields.io/badge/macOS%20%C2%B7%20Windows-installer-blue)](docs/INSTALL.md)
+[![Check](https://github.com/Micky-52Entertainment/PlayGuard/actions/workflows/check.yml/badge.svg)](https://github.com/Micky-52Entertainment/PlayGuard/actions/workflows/check.yml)
+
 **PlayGuard checks playables — the interactive mini-games inside ads — before they go to an ad network.**
 
 Someone plays the playable once: on a phone, with the mouse, or an AI does it. PlayGuard replays that playthrough on screens of every shape and watches for errors, sound, the install button and each ad network's rules. In the end it gives one clear verdict: **Ready**, **Needs a look** or **Not ready**.
 
 ![Result of a check](docs/images/3-result.png)
 
-> How to start and use it, in short: [КАК-НАЧАТЬ.md](КАК-НАЧАТЬ.md) (Russian).
-> Technical description for developers: [docs/TECHNICAL.md](docs/TECHNICAL.md).
+## Get it
+
+1. **[Download the installer](https://github.com/Micky-52Entertainment/PlayGuard/releases/latest)** for your computer: `mac-arm64.dmg` (Mac with an Apple chip), `mac-x64.dmg` (Intel Mac) or `win-x64.exe` (Windows).
+2. Install it on **one** computer in the office. The first start needs one extra click, because the app is not signed with a certificate yet: [how](docs/INSTALL.md#3-first-start).
+3. Send the team link from **Settings → Team** to your colleagues. They open it in a browser and install nothing.
+
+Full guide, requirements and troubleshooting: **[docs/INSTALL.md](docs/INSTALL.md)**. По-русски: **[КАК-НАЧАТЬ.md](КАК-НАЧАТЬ.md)**.
+Developers: [docs/TECHNICAL.md](docs/TECHNICAL.md) · releasing a version: [docs/RELEASING.md](docs/RELEASING.md).
 
 ---
 
@@ -162,6 +172,24 @@ Reports are written in Russian, English or French, in the language of the consol
 
 ## Running it
 
+### Install the app (recommended)
+
+Download the installer from [Releases](https://github.com/Micky-52Entertainment/PlayGuard/releases/latest):
+
+- **Mac with an Apple chip (M1 and newer):** `PlayGuard-…-mac-arm64.dmg`; **Intel Mac:** `PlayGuard-…-mac-x64.dmg`. Open it and drag PlayGuard into Applications.
+- **Windows:** `PlayGuard-…-win-x64.exe`. It installs PlayGuard with a Start menu and a desktop shortcut.
+
+Nothing else is needed: Node.js and the browsers for the checks are inside. The app is not signed yet, so the first start needs one extra click:
+
+- **Mac:** open PlayGuard once, then System Settings → Privacy & Security → "Open Anyway".
+- **Windows:** "Windows protected your PC" → More info → Run anyway.
+
+Requirements, updating, removing and what to do when something does not work: [docs/INSTALL.md](docs/INSTALL.md).
+
+Allow incoming connections when the system asks: phones and teammates reach PlayGuard through them. Closing the window keeps PlayGuard working for the team; quit it from the icon in the menu bar (Mac) or next to the clock (Windows). Checks, reports and settings are kept in `~/Library/Application Support/PlayGuard` (Mac) or `%APPDATA%\PlayGuard` (Windows) and stay when the app is updated or removed. On Windows updates install by themselves when you quit PlayGuard; on a Mac PlayGuard says when a new version is out and opens its download page.
+
+### From the project folder (for developers)
+
 You need a Mac or a Windows computer with [Node.js](https://nodejs.org) 20 or newer.
 
 - **Mac:** double-click `PlayGuard.command`.
@@ -184,6 +212,7 @@ If something does not work, the **Help** section in PlayGuard covers the usual q
 | --- | --- |
 | `apps/lab-console` | The PlayGuard window in the browser: the check wizard, reports, settings |
 | `apps/hub` | The server: receives files, shows the QR, sends phone touches to every screen, keeps the history |
+| `apps/desktop` | The installed app for macOS and Windows: runs the hub in its own window, installers and updates |
 | `apps/playwright-runner` | Replays the playthrough on every screen in a real browser, runs the checks and the AI, writes the report |
 | `apps/mobile` | Optional scanner app for the phone (the regular camera is enough) |
 | `samples/demo` | Demo playable and builds for a first try |

@@ -191,7 +191,7 @@ const playable = async (webm: string): Promise<{ file: string; ext: string }> =>
   return converted && existsSync(mp4) ? { file: mp4, ext: "mp4" } : { file: webm, ext: "webm" };
 };
 
-const FFMPEG_ENV = { ...process.env, PATH: `${process.env.PATH || ""}:/opt/homebrew/bin:/usr/local/bin` };
+const FFMPEG_ENV = { ...process.env, PATH: [process.env.PATH || "", "/opt/homebrew/bin", "/usr/local/bin"].join(path.delimiter) };
 
 const ffmpeg = (args: string[]): Promise<boolean> =>
   new Promise((resolve) => {

@@ -1,5 +1,11 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Getting started
-    url: https://github.com/Micky-52Entertainment/Playable-Testing-Automatisation/blob/main/README.md#running-it
-    about: Starting PlayGuard and a first check
+  - name: Download PlayGuard
+    url: https://github.com/Micky-52Entertainment/PlayGuard/releases/latest
+    about: Installers for macOS and Windows
+  - name: Installing and troubleshooting
+    url: https://github.com/Micky-52Entertainment/PlayGuard/blob/main/docs/INSTALL.md
+    about: Requirements, first start, the phone does not connect, updates
+  - name: Как начать (по-русски)
+    url: https://github.com/Micky-52Entertainment/PlayGuard/blob/main/%D0%9A%D0%90%D0%9A-%D0%9D%D0%90%D0%A7%D0%90%D0%A2%D0%AC.md
+    about: Установка и первая проверка

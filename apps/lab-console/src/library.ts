@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FpsZone } from "@playable-lab/checks";
 import { ApiError, api, postJson } from "./api";
+import type { QuickRun } from "./api";
 import { getLang } from "./i18n";
 import { getName } from "./identity";
 import type { ScreenTile } from "./Screens";
@@ -48,8 +49,44 @@ export interface TraceSummary {
     progress?: { done: number; total: number };
     screens?: ScreenTile[];
     error?: string;
+    /** The folder the run wrote into: a failed run may be continued from it. */
+    dir?: string;
   } | null;
+  /** Its latest check stopped half-way and can be continued. */
+  interrupted?: { dir: string; done: number; total: number | null };
 }
+
+/** A check that stopped before its report was written (the hub, the computer or the browser went down). */
+export interface InterruptedCheck {
+  dir: string;
+  name: string;
+  startedAt: number;
+  done: number;
+  total: number | null;
+  by?: string;
+  kind: "replay" | "load";
+  traces: string[];
+}
+
+/** Continues an interrupted check where it stopped: the screens it finished stay. */
+export const resumeCheck = (dir: string): Promise<QuickRun> =>
+  postJson<QuickRun>(`/api/interrupted/${encodeURIComponent(dir)}/resume`, {});
+
+/** Checks that can be continued, and archives with builds left unfinished. */
+export const useInterrupted = (): { checks: InterruptedCheck[]; refresh: () => Promise<void> } => {
+  const [checks, setChecks] = useState<InterruptedCheck[]>([]);
+  const refresh = useCallback(async (): Promise<void> => {
+    try {
+      setChecks(await api<InterruptedCheck[]>("/api/interrupted"));
+    } catch {
+      // The hub is down; the page says so elsewhere.
+    }
+  }, []);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+  return { checks, refresh };
+};
 
 export interface LibraryState {
   traces: TraceSummary[];
@@ -195,7 +232,13 @@ export interface BatchesState {
   upload: (file: File, traceId: string | null) => Promise<Batch | null>;
   /** Tests every build of a batch again, replaying `traceId` on each when given. */
   rerun: (batchId: string, traceId: string | null, also?: string[], depth?: "quick" | "full") => Promise<void>;
+  /** Finishes a round of tests that was interrupted: only the unfinished builds run, from where they stopped. */
+  resume: (batchId: string) => Promise<void>;
 }
+
+/** Builds an interrupted round left unfinished: they can be finished from where they stopped. */
+export const batchUnfinished = (batch: Batch): number =>
+  batchBusy(batch) ? 0 : batch.builds.filter((build) => build.state === "interrupted").length;
 
 export const batchBusy = (batch: Batch): boolean =>
   batch.builds.some((build) => build.state === "queued" || build.state === "running");
@@ -270,6 +313,18 @@ export const useBatches = (): BatchesState => {
     [refresh]
   );
 
+  const resume = useCallback(
+    async (batchId: string): Promise<void> => {
+      try {
+        await postJson(`/api/batches/${encodeURIComponent(batchId)}/resume`, {});
+      } catch (err) {
+        setError(err instanceof ApiError ? err : new ApiError("UNKNOWN", String(err)));
+      }
+      await refresh();
+    },
+    [refresh]
+  );
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -283,7 +338,7 @@ export const useBatches = (): BatchesState => {
     return () => clearInterval(timer);
   }, [busy, refresh]);
 
-  return { batches, loaded, error, uploading, refresh, upload, rerun };
+  return { batches, loaded, error, uploading, refresh, resume, upload, rerun };
 };
 
 export const formatSize = (bytes: number): string =>

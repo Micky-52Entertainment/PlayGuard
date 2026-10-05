@@ -8,7 +8,7 @@ import type { PickedFile } from "./upload";
 import { Hint } from "./Hint";
 import { checkTitle, useI18n } from "./i18n";
 import type { Key } from "./i18n";
-import { VERDICT_GLYPH, batchBusy, batchProgress, formatSize, timeLeft, when } from "./library";
+import { VERDICT_GLYPH, batchBusy, batchProgress, batchUnfinished, formatSize, timeLeft, when } from "./library";
 import type { Batch, BatchBuild, BatchCheck, BatchesState, LibraryState, Verdict } from "./library";
 import { ShowMore, usePaged } from "./paging";
 
@@ -175,6 +175,11 @@ export const BuildsView = ({ batches, library, selected, onSelect, onOpenReport,
             onClick={() => setConfirm(true)}
           >
             {t("common.delete")}
+          </button>
+        )}
+        {current && batchUnfinished(current) > 0 && (
+          <button className="primary" title={t("resume.builds", { n: batchUnfinished(current) })} onClick={() => void batches.resume(current.id)}>
+            {t("resume.finish")}
           </button>
         )}
         {current && (

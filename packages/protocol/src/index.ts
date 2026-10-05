@@ -118,6 +118,8 @@ export interface ViewportSnapshot {
   orientation: Orientation;
   contentRect: Rect;
   fit: FitMode;
+  /** The recording phone's system, from its browser: the replay of that phone runs in the same engine. */
+  os?: "ios" | "android" | "other";
 }
 
 export interface PlayableRef {
@@ -137,6 +139,8 @@ export interface DeviceProfile {
   width: number;
   height: number;
   dpr: number;
+  /** Exact CSS size per orientation, where turning the screen is not a plain swap (a phone's own browser bars). */
+  sizes?: Partial<Record<Orientation, { w: number; h: number }>>;
 }
 
 export interface TestStep {

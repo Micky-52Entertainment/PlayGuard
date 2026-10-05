@@ -10,7 +10,7 @@ import { useI18n } from "./i18n";
 import { fromDrop, fromInput, prepare } from "./upload";
 import type { PickedFile } from "./upload";
 import type { Key } from "./i18n";
-import { VERDICT_GLYPH, batchBusy, batchProgress, timeLeft } from "./library";
+import { VERDICT_GLYPH, batchBusy, batchProgress, batchUnfinished, resumeCheck, timeLeft, useInterrupted, when } from "./library";
 import type { Batch, BatchesState, LibraryState, ReportSummary, Verdict } from "./library";
 import { reportKind } from "./ReportsView";
 import { ShareBar } from "./ShareBar";
@@ -55,6 +55,8 @@ export interface Flow {
   traceIds: string[];
   /** Quick before sending, or full before a release; the setting's choice when unset. */
   depth?: "quick" | "full";
+  /** The report folder the running check writes into: it can be continued from there if it stops. */
+  runDir?: string;
 }
 
 export const EMPTY_FLOW: Flow = {
@@ -292,8 +294,102 @@ const UploadStep = ({ setFlow, library, batches, onOpenReport }: HomeViewProps) 
       </div>
       {problem && <ProblemBox problem={problem} />}
       {!problem && batches.error && <ProblemBox problem={explainError(t, batches.error)} />}
+      <Interrupted setFlow={setFlow} batches={batches} />
       <History library={library} onOpenReport={onOpenReport} />
     </div>
+  );
+};
+
+/** Checks that stopped half-way, offered to be continued from where they stopped. */
+const Interrupted = ({ setFlow, batches }: Pick<HomeViewProps, "setFlow" | "batches">) => {
+  const { t, lang } = useI18n();
+  const { checks, refresh } = useInterrupted();
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const [busy, setBusy] = useState(false);
+  const unfinished = batches.batches.filter((batch) => batchUnfinished(batch) > 0);
+  if (checks.length === 0 && unfinished.length === 0) {
+    return null;
+  }
+  const act = async (work: () => Promise<void>): Promise<void> => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      await work();
+    } catch (error) {
+      setProblem(explainError(t, error));
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="interrupted">
+      <h2>{t("resume.title")}</h2>
+      <ul>
+        {checks.map((check) => (
+          <li key={check.dir} className="interrupted-row">
+            <span className="interrupted-name">
+              <b>{check.name}</b>
+              <span className="dim">
+                {when(check.startedAt, t, lang)}
+                {check.total ? ` · ${t("resume.done", { done: check.done, total: check.total })}` : ""}
+              </span>
+            </span>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  const run = await resumeCheck(check.dir);
+                  setFlow({
+                    ...EMPTY_FLOW,
+                    name: check.name,
+                    mode: check.kind === "replay" ? "pc" : "load",
+                    runId: run.id,
+                    runDir: check.dir,
+                    step: 3,
+                  });
+                })
+              }
+            >
+              {t("resume.go")}
+            </button>
+            <button
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  await api(`/api/interrupted/${encodeURIComponent(check.dir)}`, { method: "DELETE" });
+                  await refresh();
+                })
+              }
+            >
+              {t("common.delete")}
+            </button>
+          </li>
+        ))}
+        {unfinished.map((batch) => (
+          <li key={batch.id} className="interrupted-row">
+            <span className="interrupted-name">
+              <b>{batch.name}</b>
+              <span className="dim">{t("resume.builds", { n: batchUnfinished(batch) })}</span>
+            </span>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  await batches.resume(batch.id);
+                  setFlow({ ...EMPTY_FLOW, name: batch.name, batchId: batch.id, mode: batch.traceId ? "pc" : "load", step: 3 });
+                })
+              }
+            >
+              {t("resume.finish")}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {problem && <ProblemBox problem={problem} />}
+    </section>
   );
 };
 
@@ -930,20 +1026,47 @@ const ProgressStep = ({ flow, setFlow, library, batches }: HomeViewProps) => {
     }
   }, [run?.state]);
 
+  // Remember where the check writes, so it can be continued after a restart of PlayGuard.
   useEffect(() => {
-    if (trace && !trace.job && trace.report) {
+    if (run?.dir && run.dir !== flow.runDir) {
+      setFlow({ ...flow, runDir: run.dir });
+    }
+  }, [run?.dir]);
+
+  useEffect(() => {
+    // An interrupted check is newer than the report: that report is not this check's result.
+    if (trace && !trace.job && trace.report && !trace.interrupted) {
       finish(trace.report.dir);
     }
-  }, [trace?.job, trace?.report?.dir]);
+  }, [trace?.job, trace?.report?.dir, trace?.interrupted?.dir]);
 
-  const batchDone = batch ? !batchBusy(batch) : false;
+  const unfinished = batch ? batchUnfinished(batch) : 0;
+  const batchDone = batch ? !batchBusy(batch) && unfinished === 0 : false;
   useEffect(() => {
     if (batch && batchDone) {
       finish(null);
     }
   }, [batch?.id, batchDone]);
 
+  const [resuming, setResuming] = useState(false);
+  const [resumeProblem, setResumeProblem] = useState<Problem | null>(null);
+  /** Continues the check from the folder it stopped in: the finished screens stay. */
+  const resume = async (dir: string): Promise<void> => {
+    setResuming(true);
+    setResumeProblem(null);
+    try {
+      const next = await resumeCheck(dir);
+      setFlow({ ...flow, runId: next.id, traceId: null, runDir: dir, step: 3 });
+    } catch (error) {
+      setResumeProblem(explainError(t, error));
+    } finally {
+      setResuming(false);
+    }
+  };
+
   let problem: Problem | null = null;
+  /** The folder to continue the check from, when it stopped half-way. */
+  let resumeDir: string | null = null;
   let done = 0;
   let total = 0;
   let startedAt = Date.now();
@@ -953,16 +1076,25 @@ const ProgressStep = ({ flow, setFlow, library, batches }: HomeViewProps) => {
     startedAt = run.startedAt;
     if (run.state === "failed") {
       problem = explainJob(t, run.error);
+      resumeDir = run.dir;
     }
   } else if (lost) {
-    problem = explainCode(t, "JOB_FAILED");
+    // PlayGuard was restarted mid-check: what was done is still in its folder.
+    resumeDir = flow.runDir || null;
+    problem = explainCode(t, resumeDir ? "CHECK_INTERRUPTED" : "JOB_FAILED");
   } else if (trace) {
     done = trace.job?.progress?.done || 0;
     total = trace.job?.progress?.total || 0;
     startedAt = trace.job?.startedAt || startedAt;
     if (trace.job?.state === "failed") {
       problem = explainJob(t, trace.job.error);
+      resumeDir = trace.job.dir || null;
+    } else if (!trace.job && trace.interrupted) {
+      problem = explainCode(t, "CHECK_INTERRUPTED");
+      resumeDir = trace.interrupted.dir;
     }
+  } else if (batch && unfinished > 0) {
+    problem = explainCode(t, "CHECK_INTERRUPTED");
   } else if (batch) {
     const progress = batchProgress(batch);
     done = progress.done;
@@ -987,10 +1119,24 @@ const ProgressStep = ({ flow, setFlow, library, batches }: HomeViewProps) => {
       <div className="wizard narrow">
         <h1 className="wizard-title">{t("progress.failed")}</h1>
         <ProblemBox problem={problem}>
-          <button className="primary" onClick={() => setFlow({ ...flow, step: 2, runId: null, traceId: null, recording: false })}>
+          {resumeDir && (
+            <button className="primary" disabled={resuming} onClick={() => void resume(resumeDir!)}>
+              {t("resume.go")}
+            </button>
+          )}
+          {batch && unfinished > 0 && (
+            <button className="primary" disabled={resuming} onClick={() => void batches.resume(batch.id)}>
+              {t("resume.finish")}
+            </button>
+          )}
+          <button
+            className={resumeDir || unfinished > 0 ? undefined : "primary"}
+            onClick={() => setFlow({ ...flow, step: 2, runId: null, traceId: null, runDir: undefined, recording: false })}
+          >
             {t("progress.back")}
           </button>
         </ProblemBox>
+        {resumeProblem && <ProblemBox problem={resumeProblem} />}
       </div>
     );
   }

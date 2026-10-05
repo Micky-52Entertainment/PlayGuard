@@ -13,6 +13,16 @@ const changed = (): void => listeners.forEach((listener) => listener());
 
 export type InstallState = "installed" | "ready" | "manual" | "insecure";
 
+/** What the installed desktop app puts into its window (apps/desktop/src/preload.cts). */
+export interface DesktopApp {
+  version: string;
+  checkForUpdates: () => Promise<void>;
+}
+
+/** The installed desktop app, when the console is open in its window. */
+export const desktopApp = (): DesktopApp | null =>
+  (window as { playguardDesktop?: DesktopApp }).playguardDesktop ?? null;
+
 export const installState = (): InstallState => {
   if (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone) {
     return "installed";
@@ -42,6 +52,10 @@ export const install = async (): Promise<boolean> => {
 };
 
 export const startInstall = (): void => {
+  // Already an app: no browser install, and no offline page for a server that lives in the app.
+  if (desktopApp()) {
+    return;
+  }
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     offer = event as InstallPrompt;

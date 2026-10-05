@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,7 @@ import { batchPack, reportPack } from "./pack.ts";
 import { HubBus } from "./bus.ts";
 import { Health } from "./health.ts";
 import { lanIPv4 } from "./lan.ts";
+import { findInterrupted, reportStartedAt, resumeArgs } from "./interrupted.ts";
 import { Library } from "./library.ts";
 import { asDepth, asLang, lastLine, runRunner, runnerDefaults } from "./runner.ts";
 import { renderSheet } from "./sheet.ts";
@@ -34,8 +35,9 @@ import { Sharing } from "./share.ts";
 import type { StorageReport } from "./storage.ts";
 import { renderViewPage } from "./view-page.ts";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const ROOT = process.env.PLAYGUARD_ROOT ? path.resolve(process.env.PLAYGUARD_ROOT) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const PORT = Number(process.env.HUB_PORT || 8787);
+const DESKTOP = process.env.PLAYGUARD_DESKTOP === "1";
 /** Where recordings, reports and settings live: the project folder, or a separate one (the site's own tests use a scratch folder). */
 const DATA = process.env.PLAYGUARD_DATA ? path.resolve(process.env.PLAYGUARD_DATA) : ROOT;
 const tracesDir = path.join(DATA, "traces");
@@ -239,7 +241,7 @@ const start = async (): Promise<void> => {
   batches.skip = (networkId) => settings.networksOff.includes(networkId);
   const health = new Health(ROOT);
   const simulator = new Simulator();
-  const sharing = new Sharing(ROOT, DATA, reportsDir, (dir, lang) => renderBrief(reportsDir, dir, asLang(lang)));
+  const sharing = new Sharing(DATA, reportsDir, (dir, lang) => renderBrief(reportsDir, dir, asLang(lang)));
   await sharing.load();
 
   // Builds from an uploaded archive can be recorded on like any other playable.
@@ -333,6 +335,8 @@ const start = async (): Promise<void> => {
       // The link teammates open: this computer's address, when the hub serves the console itself.
       teamUrl: existsSync(path.join(CONSOLE_DIR, "index.html")) && lanIPv4() !== "127.0.0.1" ? urls.http : null,
       engines: ["luna", "cocos", "vanilla"],
+      // Started by the installed app rather than from the project folder.
+      desktop: DESKTOP,
     });
   });
 
@@ -433,6 +437,39 @@ const start = async (): Promise<void> => {
         env: mode === "ai" ? settings.env(provider) : {},
       })
     );
+  });
+
+  // Checks that stopped half-way (the hub, the computer or the browser went down) and can be continued.
+  app.get("/api/interrupted", async (_req, res) => {
+    res.json(await findInterrupted(reportsDir, ROOT, (dir) => batches.owns(dir)));
+  });
+
+  app.post("/api/interrupted/:dir/resume", ownPage, async (req, res) => {
+    const args = await resumeArgs(reportsDir, ROOT, req.params.dir);
+    if (!args) {
+      res.status(404).json({ error: "This check cannot be continued.", code: "RUN_NOT_RESUMABLE" });
+      return;
+    }
+    const name = (await findInterrupted(reportsDir, ROOT, () => false)).find((item) => item.dir === req.params.dir)?.name || req.params.dir;
+    res.status(202).json(runs.resume(name, args, (dir) => void batches.refreshReport(dir)));
+  });
+
+  app.delete("/api/interrupted/:dir", localOnly, async (req, res) => {
+    if (!(await resumeArgs(reportsDir, ROOT, req.params.dir))) {
+      res.status(404).json({ error: "No interrupted check here.", code: "RUN_NOT_RESUMABLE" });
+      return;
+    }
+    await rm(path.join(reportsDir, req.params.dir), { recursive: true, force: true });
+    res.json({ ok: true });
+  });
+
+  app.post("/api/batches/:id/resume", async (req, res) => {
+    const batch = await batches.resume(req.params.id, async (dir) => Boolean(await resumeArgs(reportsDir, ROOT, dir)));
+    if (!batch) {
+      res.status(404).json({ error: "Batch not found", code: "BATCH_NOT_FOUND" });
+      return;
+    }
+    res.json(batch);
   });
 
   app.get("/api/runs/:id", (req, res) => {
@@ -795,6 +832,14 @@ const start = async (): Promise<void> => {
 
   app.get("/api/traces", async (req, res) => {
     const traces = await library.traces();
+    const stopped = await findInterrupted(reportsDir, ROOT, (dir) => batches.owns(dir));
+    for (const trace of traces) {
+      const check = trace.job ? undefined : stopped.find((item) => item.traces.includes(trace.id));
+      // Only when it is newer than the trace's last finished report.
+      if (check && (!trace.report || check.startedAt > (await reportStartedAt(reportsDir, trace.report.dir, trace.report.generatedAt)))) {
+        trace.interrupted = { dir: check.dir, done: check.done, total: check.total };
+      }
+    }
     res.json(pageOf(req, res, traces, (trace) => [trace.id, trace.playable, trace.stepId, trace.by, trace.orientation].join(" ")));
   });
 

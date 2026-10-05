@@ -1,0 +1,27 @@
+{
+  "name": "@playable-lab/desktop",
+  "productName": "PlayGuard",
+  "version": "1.1.0",
+  "description": "PlayGuard as an installed app for macOS and Windows",
+  "private": true,
+  "author": "Studio Adept",
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "browsers": "node scripts/fetch-browsers.mjs",
+    "start": "npm run bundle && electron stage",
+    "dist": "npm run bundle && npm run browsers && electron-builder --config electron-builder.yml --publish never",
+    "release": "npm run bundle && npm run browsers && electron-builder --config electron-builder.yml --publish always"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "electron-updater": "^6.8.9",
+    "esbuild": "^0.28.2"
+  },
+  "allowScripts": {
+    "electron@44.5.1": true,
+    "esbuild@0.28.2": true,
+    "electron-winstaller@5.4.0": true
+  }
+}

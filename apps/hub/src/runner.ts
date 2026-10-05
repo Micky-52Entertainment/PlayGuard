@@ -1,6 +1,10 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 
+/** Set by the installed app: the built runner, and the Node that runs it (the app itself, as Node). */
+const BUILT_RUNNER = process.env.PLAYGUARD_RUNNER_JS;
+const NODE = process.env.PLAYGUARD_NODE || process.execPath;
+
 export type Lang = "en" | "ru" | "fr";
 
 export const asLang = (value: unknown): Lang => (value === "ru" || value === "fr" ? value : "en");
@@ -60,6 +64,8 @@ export interface RunnerUpdate {
   tokens?: Tokens;
   /** The runner's latest line of plain output, e.g. what the AI tester just did. */
   line?: string;
+  /** The report folder the run writes into, known as soon as it starts. */
+  dir?: string;
 }
 
 export interface RunnerResult {
@@ -68,7 +74,15 @@ export interface RunnerResult {
   output: string;
   /** Folder name under reports/, when a report was written. */
   reportDir: string | null;
+  /** The folder the run wrote into, finished or not: an interrupted check can be continued from it. */
+  dir: string | null;
 }
+
+/** Report folders a runner of this hub is writing right now. */
+const writing = new Set<string>();
+
+/** Is a check running into this folder? Then it is not interrupted, only unfinished. */
+export const isWriting = (dir: string): boolean => writing.has(dir);
 
 /** How deep a check goes: the main screens only, or everything before a release. */
 export type Depth = "quick" | "full";
@@ -101,17 +115,19 @@ export const runRunner = (
   } = {}
 ): Promise<RunnerResult> =>
   new Promise((resolve) => {
-    const child = spawn(
-      path.join(root, "node_modules/.bin/tsx"),
-      [path.join(root, "apps/playwright-runner/src/index.ts"), ...args, ...(options.noDefaults ? [] : runnerDefaults.argsFor(options.depth))],
-      {
-        cwd: root,
-        env: { ...process.env, ...options.env, INIT_CWD: root },
-        shell: process.platform === "win32",
-      }
-    );
+    const fullArgs = [...args, ...(options.noDefaults ? [] : runnerDefaults.argsFor(options.depth))];
+    const env = { ...process.env, ...options.env, INIT_CWD: root };
+    const child = BUILT_RUNNER
+      ? // The installed app: the runner is built to plain JavaScript and runs on the app's own Node.
+        spawn(NODE, [BUILT_RUNNER, ...fullArgs], { cwd: root, env: { ...env, ELECTRON_RUN_AS_NODE: "1" } })
+      : spawn(path.join(root, "node_modules/.bin/tsx"), [path.join(root, "apps/playwright-runner/src/index.ts"), ...fullArgs], {
+          cwd: root,
+          env,
+          shell: process.platform === "win32",
+        });
     let output = "";
     let pending = "";
+    let dir: string | null = null;
     const collect = (chunk: Buffer): void => {
       pending += chunk.toString();
       const lines = pending.split("\n");
@@ -125,6 +141,12 @@ export const runRunner = (
           } catch {
             // A malformed line only costs a picture.
           }
+          continue;
+        }
+        if (line.startsWith("@@dir ")) {
+          dir = line.slice(6).trim();
+          writing.add(dir);
+          options.onUpdate?.({ dir });
           continue;
         }
         const progress = /^@@progress (\d+) (\d+)/.exec(line);
@@ -145,14 +167,18 @@ export const runRunner = (
     };
     child.stdout.on("data", collect);
     child.stderr.on("data", collect);
-    child.on("error", (error) => resolve({ code: null, output: error.message, reportDir: null }));
+    child.on("error", (error) => resolve({ code: null, output: error.message, reportDir: null, dir: null }));
     child.on("close", (code) => {
+      if (dir) {
+        writing.delete(dir);
+      }
       output = `${output}${pending}`.slice(-4000);
       const match = /(?:PASS|WARN|FAIL)\s+(.+)[/\\]index\.html\s*$/m.exec(output.trim());
       resolve({
         code,
         output,
         reportDir: (code === 0 || code === 1) && match ? path.basename(match[1]) : null,
+        dir,
       });
     });
   });

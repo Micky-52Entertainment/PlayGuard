@@ -53,6 +53,8 @@ export interface ReplayPlan {
   firstInputAt?: number;
   /** "load": events carry `rt`. "first-event": old trace, timed from its first event. */
   timing: "load" | "first-event";
+  /** CSS size of the recording phone's game area, to carry a drag's distance over to another screen. */
+  source?: { w: number; h: number };
 }
 
 export const DEFAULT_PLAN_OPTIONS: PlanOptions = {
@@ -231,5 +233,11 @@ export const buildReplayPlan = (
     inputs,
     firstInputAt,
     timing,
+    source: sourceSize(trace),
   };
+};
+
+const sourceSize = (trace: SessionTrace): ReplayPlan["source"] => {
+  const rect = trace.sourceViewport?.contentRect;
+  return rect && rect.w > 0 && rect.h > 0 ? { w: rect.w, h: rect.h } : undefined;
 };

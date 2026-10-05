@@ -33,7 +33,7 @@ body:
         - Result and report
         - Builds
         - Settings
-        - Starting PlayGuard
+        - Installing or starting PlayGuard
         - Other
   - type: textarea
     id: report
@@ -41,7 +41,13 @@ body:
       label: Report
       description: If the check finished, attach the "Developer" report or name its folder in reports/.
   - type: input
+    id: version
+    attributes:
+      label: PlayGuard version
+      description: The installed app shows it in About PlayGuard (Mac) or Settings. From the project folder, write "source" and the commit if you know it.
+      placeholder: e.g. 1.1.0, or source
+  - type: input
     id: computer
     attributes:
       label: Computer and browser
-      placeholder: e.g. macOS 15, Chrome 140
+      placeholder: e.g. macOS 15 on Apple M2, Chrome 140

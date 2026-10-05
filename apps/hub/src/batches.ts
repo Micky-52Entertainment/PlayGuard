@@ -39,6 +39,8 @@ export interface BatchBuild {
   screens: Record<Verdict, number> | null;
   reportDir: string | null;
   reportUrl: string | null;
+  /** The report folder of the build's latest run, known as soon as it starts: an interrupted run continues there. */
+  runDir?: string;
 }
 
 export interface Batch {
@@ -63,6 +65,8 @@ export interface Batch {
 interface StoredBuild extends BatchBuild {
   /** Entry HTML, relative to the batch folder. */
   entry: string;
+  /** Set when the next run continues the interrupted one in this folder. */
+  resumeDir?: string;
 }
 
 interface StoredBatch extends Omit<Batch, "builds"> {
@@ -468,6 +472,45 @@ export class BatchStore {
     return this._public(batch);
   }
 
+  /** Is this report folder a build's run? The archive continues it itself. */
+  public owns(dir: string): boolean {
+    for (const batch of this._batches.values()) {
+      if (batch.builds.some((build) => build.runDir === dir)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Builds an interrupted round left unfinished. */
+  public unfinished(id: string): number {
+    return this._batches.get(id)?.builds.filter((build) => build.state === "interrupted" || build.state === "failed").length || 0;
+  }
+
+  /**
+   * Finishes an interrupted round: the builds that were done stay, the
+   * interrupted ones continue where they stopped (or start again when nothing
+   * of them was kept).
+   */
+  public async resume(id: string, canContinue: (dir: string) => Promise<boolean>): Promise<Batch | undefined> {
+    const batch = this._batches.get(id);
+    if (!batch) {
+      return undefined;
+    }
+    for (const build of batch.builds) {
+      if (build.state !== "interrupted" && build.state !== "failed") {
+        continue;
+      }
+      build.resumeDir = build.runDir && (await canContinue(build.runDir)) ? build.runDir : undefined;
+      build.state = "queued";
+      build.error = undefined;
+      this._queue.push({ batchId: id, buildId: build.id });
+    }
+    await this._save(batch);
+    this._pump();
+    return this._public(batch);
+  }
+
   private _skipped(build: BatchBuild): boolean {
     return Boolean(build.network?.known && this.skip(build.network.id));
   }
@@ -482,7 +525,7 @@ export class BatchStore {
       depth: batch.depth,
       runStartedAt: batch.runStartedAt,
       by: batch.by,
-      builds: batch.builds.map(({ entry: _entry, ...build }) => build),
+      builds: batch.builds.map(({ entry: _entry, resumeDir: _resume, ...build }) => build),
     };
   }
 
@@ -591,6 +634,10 @@ export class BatchStore {
     if (first && first.id !== build.id) {
       args.push("--languages", "none", "--old-phones", "none");
     }
+    if (build.resumeDir) {
+      args.push("--resume", path.join(this._reportsDir, build.resumeDir));
+      build.resumeDir = undefined;
+    }
 
     build.progress = undefined;
     const result = await runRunner(this._root, args, {
@@ -598,6 +645,10 @@ export class BatchStore {
       onUpdate: (update) => {
         if (update.progress) {
           build.progress = update.progress;
+        }
+        if (update.dir && update.dir !== build.runDir) {
+          build.runDir = update.dir;
+          void this._save(batch);
         }
         build.tiles = applyScreens(build.tiles, update);
       },

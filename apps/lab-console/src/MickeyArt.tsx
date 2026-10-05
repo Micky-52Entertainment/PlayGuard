@@ -10,6 +10,41 @@ import type { Pose } from "./mascotBus";
 export type Effect = "none" | "confetti" | "sparkle" | "sweat" | "rain" | "zzz" | "search" | "question" | "hearts";
 export type Motion = "none" | "bounce" | "shake" | "float" | "breathe" | "sway" | "peek";
 
+const RETRIES = 6;
+
+/**
+ * One picture of Micky. A load that fails (a dropped request over Wi-Fi, the
+ * hub restarting) is tried again a moment later instead of leaving the
+ * browser's broken-image box; until then nothing is drawn.
+ */
+export const MickeyPicture = ({ src }: { src: string }) => {
+  const [attempt, setAttempt] = useState(0);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setAttempt(0);
+    setFailed(false);
+  }, [src]);
+  useEffect(() => {
+    if (!failed || attempt >= RETRIES) {
+      return;
+    }
+    const again = setTimeout(() => {
+      setAttempt((value) => value + 1);
+      setFailed(false);
+    }, 500 * 2 ** attempt);
+    return () => clearTimeout(again);
+  }, [failed, attempt]);
+  return (
+    <img
+      src={attempt === 0 ? src : `${src}?retry=${attempt}`}
+      alt=""
+      draggable={false}
+      style={failed ? { visibility: "hidden" } : undefined}
+      onError={() => setFailed(true)}
+    />
+  );
+};
+
 export interface MickeyState {
   pose: Pose;
   effect?: Effect;
@@ -163,7 +198,7 @@ export const MickeyArt = ({
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <img key={look.pose} src={look.pose === "walk" ? `/mascot/walk${(stride % 2) + 1}.webp` : picture(look.pose)} alt="" draggable={false} />
+      <MickeyPicture key={look.pose} src={look.pose === "walk" ? `/mascot/walk${(stride % 2) + 1}.webp` : picture(look.pose)} />
       {look.effect && look.effect !== "none" && <EffectArt effect={look.effect} />}
     </span>
   );

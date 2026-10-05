@@ -24,6 +24,10 @@ export interface QuickRun {
   /** The runner's latest line: what the AI tester just saw and did. */
   lastLine: string | null;
   reportDir: string | null;
+  /** The folder the run writes into: an interrupted run is continued from it. */
+  dir: string | null;
+  /** Continues a check that was interrupted. */
+  resumed?: boolean;
   verdict: Verdict | null;
   error?: string;
 }
@@ -61,23 +65,12 @@ export class RunStore {
   }
 
   public start(request: QuickRunRequest): QuickRun {
-    const id = `r_${Date.now().toString(36)}_${this._seq}`;
-    this._seq += 1;
-    const run: QuickRun = {
-      id,
+    const run = this._create({
       playableId: request.playableId,
       playable: request.playable,
       mode: request.mode,
       provider: request.mode === "ai" ? request.provider || "claude" : null,
-      state: "running",
-      startedAt: Date.now(),
-      progress: null,
-      tokens: null,
-      lastLine: null,
-      reportDir: null,
-      verdict: null,
-    };
-    this._runs.set(id, run);
+    });
 
     const args = ["--playable", request.file, "--name", request.playable, "--out", this._reportsDir, "--lang", request.lang];
     if (request.mode === "ai") {
@@ -94,10 +87,52 @@ export class RunStore {
       args.push("--bundle", "--zip-bytes", String(request.bundleBytes));
     }
 
+    this._follow(run, args, { env: request.env, depth: request.depth });
+    console.log(`[hub] ${request.mode} run started for ${request.playable}`);
+    return run;
+  }
+
+  /** Continues an interrupted check in its own folder: the screens it finished stay. */
+  public resume(name: string, args: string[], onDone?: (reportDir: string) => void): QuickRun {
+    const run = this._create({ playableId: "", playable: name, mode: "load", provider: null });
+    run.resumed = true;
+    // The saved command line already holds the settings the check was started with.
+    this._follow(run, args, { noDefaults: true }, onDone);
+    console.log(`[hub] continuing the check of ${name}`);
+    return run;
+  }
+
+  private _create(fields: Pick<QuickRun, "playableId" | "playable" | "mode" | "provider">): QuickRun {
+    const id = `r_${Date.now().toString(36)}_${this._seq}`;
+    this._seq += 1;
+    const run: QuickRun = {
+      id,
+      ...fields,
+      state: "running",
+      startedAt: Date.now(),
+      progress: null,
+      tokens: null,
+      lastLine: null,
+      reportDir: null,
+      dir: null,
+      verdict: null,
+    };
+    this._runs.set(id, run);
+    return run;
+  }
+
+  private _follow(
+    run: QuickRun,
+    args: string[],
+    options: { env?: NodeJS.ProcessEnv; depth?: Depth; noDefaults?: boolean },
+    onDone?: (reportDir: string) => void
+  ): void {
     void runRunner(this._root, args, {
-      env: request.env,
-      depth: request.depth,
+      ...options,
       onUpdate: (update) => {
+        if (update.dir) {
+          run.dir = update.dir;
+        }
         if (update.progress) {
           run.progress = update.progress;
         }
@@ -125,8 +160,7 @@ export class RunStore {
         run.verdict = result.code === 0 ? "pass" : "fail";
       }
       run.state = "done";
+      onDone?.(result.reportDir);
     });
-    console.log(`[hub] ${request.mode} run started for ${request.playable}`);
-    return run;
   }
 }

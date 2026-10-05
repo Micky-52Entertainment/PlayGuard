@@ -38,10 +38,12 @@ import { chromium, webkit } from "playwright";
 import type { Browser, BrowserContext, CDPSession, Page } from "playwright";
 import { AI_PROVIDERS, aiCheck, createProvider } from "./ai.ts";
 import type { AiRunInfo, Lang } from "./ai.ts";
-import { analyse, frameDifference } from "./frames.ts";
+import { analyse, grayFrame, frameDifference } from "./frames.ts";
 import { AiSetupError, pilot, review } from "./pilot.ts";
 import type { AiSettings } from "./pilot.ts";
 import { buildReplayPlan } from "./plan.ts";
+import { applyLayout, candidateScales, findSpot, fitLayout, pickLayout } from "./locate.ts";
+import type { Gray, Layout, Point } from "./locate.ts";
 import type { ReplayAction, ReplayPlan, TouchPoint } from "./plan.ts";
 import { renderReport } from "./report.ts";
 import type { ConsoleLine, DeviceRun, RunReport, Shot } from "./report.ts";
@@ -53,7 +55,7 @@ import type { TextSnapshot } from "./text.ts";
 import { OLD_PROFILES, oldBrowserScript, oldCodeCheck, scanFeatures } from "./compat.ts";
 import type { OldProfile } from "./compat.ts";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const ROOT = process.env.PLAYGUARD_ROOT ? path.resolve(process.env.PLAYGUARD_ROOT) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 /** Recordings, uploads and reports: the project folder unless the hub runs on a separate one. */
 const DATA = process.env.PLAYGUARD_DATA ? path.resolve(process.env.PLAYGUARD_DATA) : ROOT;
 // npm runs workspace scripts from the package folder; paths on the command line
@@ -86,6 +88,8 @@ Options
   --lead-in <ms>        delay before the first event of a trace without load-relative time (default 1500)
   --settle <ms>         how long a smoke run waits before the final frame (default 4000)
   --no-video            do not record video
+  --no-own-phone        do not replay on the recording phone's own screen first (the reference
+                        the other screens' touches are placed by)
   --headed              show the browser
   --channel <name>      browser channel, e.g. chrome (default: bundled Chromium, then Chrome)
   --out <dir>           report root (default: reports)
@@ -192,8 +196,10 @@ const PROBE_SOURCE = `
 })();
 `;
 
-// Measures what the page actually sends to the speakers, in three parts of a
-// run: before the first touch, after it, and while the ad is hidden.
+// Measures what the page would send to the speakers, in three parts of a
+// run: before the first touch, after it, and while the ad is hidden. Nothing
+// reaches the speakers: Chromium runs with --mute-audio, but WebKit has no such
+// switch, so the page's output is silenced here, after the measuring point.
 const AUDIO_PROBE_SOURCE = `
 (function () {
   if (window.__labAudio) return;
@@ -205,7 +211,10 @@ const AUDIO_PROBE_SOURCE = `
     for (var i = 0; i < taps.length; i += 1) if (taps[i].ctx === ctx) return taps[i];
     var analyser = ctx.createAnalyser();
     analyser.fftSize = 1024;
-    var tap = { ctx: ctx, analyser: analyser, data: new Float32Array(1024) };
+    // The page's sound goes to the analyser, and on to the speakers at zero volume.
+    var silent = ctx.createGain();
+    silent.gain.value = 0;
+    var tap = { ctx: ctx, analyser: analyser, silent: silent, data: new Float32Array(1024) };
     taps.push(tap);
     return tap;
   }
@@ -216,19 +225,61 @@ const AUDIO_PROBE_SOURCE = `
         var ctx = target && target.context;
         var offline = typeof OfflineAudioContext !== "undefined" && ctx instanceof OfflineAudioContext;
         if (ctx && !offline && target === ctx.destination) {
-          connect.call(this, tapFor(ctx).analyser);
+          var tap = tapFor(ctx);
+          connect.call(this, tap.analyser);
+          if (!tap.wired) {
+            tap.wired = true;
+            connect.call(tap.silent, ctx.destination);
+          }
+          var args = Array.prototype.slice.call(arguments);
+          args[0] = tap.silent;
+          return connect.apply(this, args);
         }
       } catch (_) {}
       return connect.apply(this, arguments);
     };
   } catch (_) {}
+  // <audio> and <video>: the element is always muted for real, while the page
+  // (and the measurement below) sees the "muted" it set itself.
+  var wanted = new WeakMap();
+  function wish(el) {
+    var w = wanted.get(el);
+    if (!w) {
+      w = { muted: el.defaultMuted };
+      wanted.set(el, w);
+    }
+    return w;
+  }
+  try {
+    var mutedProp = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "muted");
+    Object.defineProperty(HTMLMediaElement.prototype, "muted", {
+      configurable: true,
+      enumerable: mutedProp.enumerable,
+      get: function () { return wish(this).muted; },
+      set: function (value) {
+        wish(this).muted = Boolean(value);
+        mutedProp.set.call(this, true);
+      },
+    });
+    var silence = function (el) {
+      wish(el);
+      if (!mutedProp.get.call(el)) mutedProp.set.call(el, true);
+    };
+  } catch (_) {
+    var silence = function () {};
+  }
   try {
     var play = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function () {
       if (played.indexOf(this) === -1) played.push(this);
+      silence(this);
       return play.apply(this, arguments);
     };
   } catch (_) {}
+  // Elements that start by the autoplay attribute never call play().
+  document.addEventListener("play", function (event) {
+    if (event.target instanceof HTMLMediaElement) silence(event.target);
+  }, true);
   function level() {
     var peak = 0;
     var i;
@@ -248,6 +299,7 @@ const AUDIO_PROBE_SOURCE = `
     for (i = 0; i < inPage.length; i += 1) if (list.indexOf(inPage[i]) === -1) list.push(inPage[i]);
     for (i = 0; i < list.length; i += 1) {
       var el = list[i];
+      silence(el);
       var silentVideo = el.tagName === "VIDEO" && el.webkitAudioDecodedByteCount === 0;
       if (!el.paused && !el.ended && !el.muted && el.volume > 0 && el.readyState > 2 && !silentVideo) {
         peak = Math.max(peak, el.volume);
@@ -519,7 +571,46 @@ const resolvePlayable = async (trace: SessionTrace | undefined): Promise<Playabl
   };
 };
 
-const resolveDevices = (trace: SessionTrace | undefined): DeviceProfile[] => {
+/** The phone the recording was made on, replayed at its own size: the reference for every other screen. */
+const OWN_PHONE = "your-phone";
+
+const ownPhone = (traces: SessionTrace[]): DeviceProfile | undefined => {
+  const sizes: NonNullable<DeviceProfile["sizes"]> = {};
+  let first: SessionTrace | undefined;
+  for (const item of traces) {
+    const viewport = item.sourceViewport;
+    // Played with a mouse on the computer: there is no phone to copy.
+    if (!viewport || !(viewport.cssWidth > 0 && viewport.cssHeight > 0) || !item.events.some((event) => event.kind === "touch")) {
+      continue;
+    }
+    sizes[item.orientationLock] = { w: Math.round(viewport.cssWidth), h: Math.round(viewport.cssHeight) };
+    first = first || item;
+  }
+  if (!first) {
+    return undefined;
+  }
+  const viewport = first.sourceViewport;
+  const short = Math.min(viewport.cssWidth, viewport.cssHeight);
+  const os = viewport.os === "ios" ? "ios" : "android";
+  return {
+    id: OWN_PHONE,
+    name: viewport.os === "ios" ? "Your phone (iPhone)" : viewport.os === "android" ? "Your phone (Android)" : "Your phone",
+    group: short >= 600 ? "tablet" : os,
+    os,
+    width: Math.round(viewport.cssWidth),
+    height: Math.round(viewport.cssHeight),
+    dpr: viewport.dpr || 2,
+    sizes,
+  };
+};
+
+const resolveDevices = (trace: SessionTrace | undefined, traces: SessionTrace[] = trace ? [trace] : []): DeviceProfile[] => {
+  const own = flag("--no-own-phone") ? undefined : ownPhone(traces);
+  const devices = catalogDevices(trace);
+  return own ? [own, ...devices] : devices;
+};
+
+const catalogDevices = (trace: SessionTrace | undefined): DeviceProfile[] => {
   const catalog = devicesById();
   const raw = option("--devices");
   let ids: string[];
@@ -666,6 +757,17 @@ interface RunContext {
   ctaAt?: number;
   /** The scripts the playable really ran, read on its first Chromium screen: checked for old browsers. */
   sources?: string[];
+  /** What the recording phone's own replay showed, per orientation: where every other screen looks for the touches. */
+  reference?: Map<Orientation, Reference>;
+}
+
+interface Reference {
+  /** The screen right after load. */
+  loaded?: Gray;
+  /** The screen just before each finger landed, by action index. */
+  frames: Map<number, Gray>;
+  /** Where each finger landed, by action index and finger. */
+  taps: Map<number, Map<number, Point>>;
 }
 
 /** What one screen of an autoplay run does. */
@@ -997,6 +1099,31 @@ const runDevice = async (
     await sleep(Math.min(800, firstAt - (Date.now() - loadedAt) - 150));
     firstFrame = await capture("loaded");
 
+    // The recording phone's own replay keeps what it saw; every other screen
+    // finds the recorded touches in it (see locate.ts).
+    const own = device.id === OWN_PHONE && Boolean(plan) && !job.plan;
+    let reference = run.reference?.get(orientation);
+    if (own) {
+      reference = { frames: new Map(), taps: new Map() };
+      run.reference = run.reference || new Map();
+      run.reference.set(orientation, reference);
+    } else if (job.plan) {
+      reference = undefined;
+    }
+    const grayOf = async (png: Buffer | undefined): Promise<Gray | undefined> =>
+      png ? grayFrame(run.helper, png, cssWidth, cssHeight, 4).catch(() => undefined) : undefined;
+    const loadedGray = reference && plan ? await grayOf(firstFrame) : undefined;
+    let layout: Layout | undefined;
+    if (own && reference) {
+      reference.loaded = loadedGray;
+    } else if (reference?.loaded && loadedGray) {
+      layout = pickLayout(reference.loaded, loadedGray);
+      note(`the game is fitted to this screen as "${layout.kind}" (match ${layout.score.toFixed(2)} with the recording phone)`);
+      if (layout.score < 0.5) {
+        layout = undefined;
+      }
+    }
+
     let rect: Rect = { x: 0, y: 0, w: cssWidth, h: cssHeight };
     const refreshRect = async (): Promise<void> => {
       try {
@@ -1035,6 +1162,131 @@ const runDevice = async (
       }
       return points.map((point) => toPx(point.nx, point.ny));
     };
+
+    // Where each finger lands, in order of trust:
+    //  1. the scene, when the recording carries an anchor and the engine is
+    //     reachable: exact on any screen;
+    //  2. on the recording phone itself, the recorded spot: exact by definition;
+    //  3. the picture: the neighbourhood of the touch on the recording phone's
+    //     replay, found on this screen at the same moment (locate.ts);
+    //  4. the layout: the scale and offset fitted to the touches found so far,
+    //     else the way the game's first picture fits this screen;
+    //  5. the same fraction of the game area.
+    // After landing, a finger travels the distance it travelled on the phone,
+    // times the scale found for it. A move's own anchor is relative to the object
+    // under the finger: when that object follows the finger (a dragged piece, a
+    // panned map) it resolves to where the finger already is and the drag would
+    // never move. Only a world point (Unity gameplay) is resolved again each move.
+    const origins = new Map<number, { x: number; y: number; nx: number; ny: number; sx: number; sy: number }>();
+    const matches: Array<{ from: Point; to: Point }> = [];
+    const placedBy: Record<string, number> = {};
+    const worldPoint = (point: TouchPoint): boolean =>
+      Boolean(point.anchor && point.anchor.engine === "unity" && !point.anchor.path);
+    const source = plan?.source;
+    const sourceRect = (): { x: number; y: number; w: number; h: number } => ({
+      x: 0,
+      y: 0,
+      w: source?.w || rect.w,
+      h: source?.h || rect.h,
+    });
+    const place = async (
+      type: string,
+      points: TouchPoint[],
+      index: number,
+      frame?: Gray
+    ): Promise<Array<{ x: number; y: number }>> => {
+      const fresh = points.filter((point) => !origins.has(point.id) || worldPoint(point));
+      const resolved = fresh.length ? await resolve(fresh) : [];
+      const fit = matches.length >= 2 ? fitLayout(matches, Math.min(cssWidth, cssHeight) * 0.08) : undefined;
+      const fallback = fit || layout;
+      const minScale = source ? Math.min(rect.w / source.w, rect.h / source.h) : 1;
+      const placed = points.map((point) => {
+        const origin = origins.get(point.id);
+        if (origin) {
+          if (worldPoint(point)) {
+            return resolved[fresh.indexOf(point)] || { x: origin.x, y: origin.y };
+          }
+          const src = sourceRect();
+          return {
+            x: origin.x + (clamp01(point.nx) - origin.nx) * src.w * origin.sx,
+            y: origin.y + (clamp01(point.ny) - origin.ny) * src.h * origin.sy,
+          };
+        }
+        let landed = resolved[fresh.indexOf(point)];
+        let sx = rect.w / sourceRect().w;
+        let sy = rect.h / sourceRect().h;
+        let by = point.anchor ? "scene" : "fraction";
+        const recorded = reference?.taps.get(index)?.get(point.id);
+        if (own) {
+          by = "recording";
+        } else if (point.anchor && type === "touchStart") {
+          // Scene anchors resolved by the engine are exact; a dragged object's scale is the game's.
+          sx = sy = fallback ? fallback.sx : minScale;
+        } else if (recorded && type === "touchStart") {
+          const before = reference?.frames.get(index);
+          const prior = fallback ? applyLayout(fallback, recorded) : landed;
+          const found =
+            before && frame
+              ? findSpot(before, recorded, frame, {
+                  prior,
+                  scales: candidateScales(
+                    { w: before.w * before.unit, h: before.h * before.unit },
+                    { w: cssWidth, h: cssHeight },
+                    fit?.sx
+                  ),
+                  sides: [Math.min(cssWidth, cssHeight, before.w * before.unit, before.h * before.unit) * 0.3, 64],
+                  minScore: 0.6,
+                })
+              : undefined;
+          if (found) {
+            landed = { x: found.x, y: found.y };
+            sx = sy = found.scale;
+            by = "picture";
+            matches.push({ from: recorded, to: landed });
+          } else if (fallback) {
+            landed = applyLayout(fallback, recorded);
+            sx = fallback.sx;
+            sy = fallback.sy;
+            by = fit ? "touches found so far" : `layout (${fallback.kind})`;
+          }
+        }
+        if (type === "touchStart") {
+          placedBy[by] = (placedBy[by] || 0) + 1;
+        }
+        landed = {
+          x: Math.min(Math.max(landed.x, 1), cssWidth - 1),
+          y: Math.min(Math.max(landed.y, 1), cssHeight - 1),
+        };
+        if (own && reference && type === "touchStart") {
+          const taps = reference.taps.get(index) || new Map<number, Point>();
+          taps.set(point.id, landed);
+          reference.taps.set(index, taps);
+        }
+        origins.set(point.id, { ...landed, nx: clamp01(point.nx), ny: clamp01(point.ny), sx, sy });
+        return landed;
+      });
+      if (type === "touchCancel" || (type === "touchEnd" && points.length === 0)) {
+        origins.clear();
+      } else if (type === "touchEnd") {
+        points.forEach((point) => origins.delete(point.id));
+      }
+      return placed;
+    };
+    // A picture of the screen at this moment of the playthrough, to place the next touch by.
+    const grab = async (): Promise<Gray | undefined> => {
+      try {
+        return await grayOf(await page.screenshot({ scale: "css" }));
+      } catch {
+        return undefined;
+      }
+    };
+    // The in-page replay maps by screen fraction: hand it the placed point as one.
+    const asFraction = (point: TouchPoint, at: { x: number; y: number }): TouchPoint => ({
+      ...point,
+      nx: (at.x - rect.x) / rect.w,
+      ny: (at.y - rect.y) / rect.h,
+      anchor: undefined,
+    });
 
     if (job.scenario) {
       if (!cdp) {
@@ -1080,7 +1332,7 @@ const runDevice = async (
         anchor: item.anchor,
       })),
     });
-    const webkitTouch = async (index: number): Promise<boolean> => {
+    const webkitTouch = async (index: number, at: Array<{ x: number; y: number }>): Promise<boolean> => {
       const action = actions[index];
       if (action.kind !== "touch") {
         return false;
@@ -1088,8 +1340,9 @@ const runDevice = async (
       if (action.type === "touchStart" && contacts.size === 0) {
         const end = tapEndIndex(actions, index);
         if (end !== -1) {
-          const [at] = await resolve(action.points);
-          await page.touchscreen.tap(at.x, at.y);
+          await page.touchscreen.tap(at[0].x, at[0].y);
+          // The lift is part of the tap.
+          origins.delete(action.points[0].id);
           let shot = false;
           for (let k = index + 1; k <= end; k += 1) {
             skipped.add(k);
@@ -1098,10 +1351,11 @@ const runDevice = async (
           return shot;
         }
       }
+      const points = action.points.map((point, p) => asFraction(point, at[p]));
       const samples: unknown[] = [];
       if (action.type === "touchStart" || action.type === "touchMove") {
-        for (let p = 0; p < action.points.length; p += 1) {
-          const point = action.points[p];
+        for (let p = 0; p < points.length; p += 1) {
+          const point = points[p];
           const known = contacts.has(point.id);
           const primary = contacts.size === 0 || contacts.keys().next().value === point.id;
           contacts.set(point.id, point);
@@ -1110,7 +1364,7 @@ const runDevice = async (
           }
         }
       } else {
-        const lifted = action.points.length > 0 ? action.points : Array.from(contacts.values());
+        const lifted = points.length > 0 ? points : Array.from(contacts.values());
         for (let p = 0; p < lifted.length; p += 1) {
           const point = contacts.get(lifted[p].id) || lifted[p];
           const primary = contacts.keys().next().value === point.id;
@@ -1151,19 +1405,42 @@ const runDevice = async (
 
     let shotPending = false;
     let failures = 0;
+    // How far the replay has fallen behind the recording, carried forward so a
+    // late gesture keeps its own speed instead of firing in one burst.
+    let lag = 0;
     for (let i = 0; i < actions.length; i += 1) {
       if (skipped.has(i)) {
         continue;
       }
       const action = actions[i];
-      let wait = loadedAt + action.at - Date.now();
+      let wait = loadedAt + lag + action.at - Date.now();
       if (shotPending) {
         // Give the game a moment to react before the picture, if the trace allows.
         const pause = Math.min(350, wait);
         await sleep(pause);
         await capture(`after input at ${(actions[i - 1].at / 1000).toFixed(1)}s`);
         shotPending = false;
-        wait = loadedAt + action.at - Date.now();
+        wait = loadedAt + lag + action.at - Date.now();
+      }
+      // A picture just before a finger lands: kept on the recording phone, looked
+      // into on the other screens. Taken a little ahead so the touch stays on time.
+      const landing = action.kind === "touch" && action.type === "touchStart";
+      let frame: Gray | undefined;
+      if (
+        landing &&
+        reference &&
+        (own || (reference.frames.has(i) && action.points.some((point) => !point.anchor)))
+      ) {
+        await sleep(wait - 150);
+        frame = await grab();
+        if (own && frame) {
+          reference.frames.set(i, frame);
+        }
+        wait = loadedAt + lag + action.at - Date.now();
+      }
+      if (wait < 0 && landing && action.kind === "touch" && action.remaining === 1) {
+        lag -= wait;
+        wait = 0;
       }
       await sleep(wait);
 
@@ -1172,25 +1449,19 @@ const runDevice = async (
           if (action.type === "touchStart") {
             await refreshRect();
             evidence.inputs += 1;
-            if (inWebkit) {
-              const [where] = await resolve(action.points.slice(-1));
-              if (where) {
-                taps.push(where);
-              }
-            }
+          }
+          const mapped = await place(action.type, action.points, i, frame);
+          if (action.type === "touchStart" && mapped.length > 0) {
+            taps.push(mapped[mapped.length - 1]);
           }
           if (inWebkit) {
-            if (await webkitTouch(i)) {
+            if (await webkitTouch(i, mapped)) {
               shotPending = true;
             }
             continue;
           }
           if (!cdp) {
             cdp = await context.newCDPSession(page);
-          }
-          const mapped = await resolve(action.points);
-          if (action.type === "touchStart" && mapped.length > 0) {
-            taps.push(mapped[mapped.length - 1]);
           }
           await cdp.send("Input.dispatchTouchEvent", {
             type: action.type,
@@ -1235,6 +1506,10 @@ const runDevice = async (
       if ((action.kind === "touch" || action.kind === "mouse") && action.shot) {
         shotPending = true;
       }
+    }
+
+    if (Object.keys(placedBy).length > 0) {
+      note(`touches placed by: ${Object.entries(placedBy).map(([by, count]) => `${by} ${count}`).join(", ")}`);
     }
 
     await sleep(
@@ -1676,7 +1951,7 @@ const main = async (): Promise<number> => {
     trace.deviceIds = ids.size > 0 ? Array.from(ids) : trace.deviceIds;
   }
   const playable = await resolvePlayable(trace);
-  const devices = resolveDevices(trace);
+  const devices = resolveDevices(trace, traces);
   const orientations = traces.length > 1 ? traces.map((item) => item.orientationLock) : resolveOrientations(trace);
 
   const networkId = option("--network");
@@ -1785,28 +2060,65 @@ const main = async (): Promise<number> => {
     };
   }
 
-  const started = new Date();
   // One screen of an existing report checked again: its result replaces the old one there.
   const only = option("--only");
   const into = option("--into");
   if (Boolean(only) !== Boolean(into)) {
     throw new Error("--only and --into go together: the screen to check again, and the report it belongs to.");
   }
+  // An interrupted check continued: the screens it finished are kept, the rest are checked.
+  const resume = option("--resume");
+  if (resume && (only || ai)) {
+    throw new Error(only ? "--resume and --only do not go together." : "A check the AI played cannot be continued: start it again.");
+  }
+  const resumed: RunInfo | undefined = resume
+    ? (JSON.parse(await readFile(path.join(userPath(resume), "run.json"), "utf8")) as RunInfo)
+    : undefined;
+  const started = resumed?.startedAt ? new Date(resumed.startedAt) : new Date();
   const outDir = into
     ? userPath(into)
-    : path.join(userPath(option("--out") || path.join(DATA, "reports")), `${slug(trace ? trace.sessionId : playable.name)}-${stamp(started)}`);
+    : resume
+      ? userPath(resume)
+      : path.join(userPath(option("--out") || path.join(DATA, "reports")), `${slug(trace ? trace.sessionId : playable.name)}-${stamp(started)}`);
   await mkdir(outDir, { recursive: true });
+  // The hub learns the folder at once, so an interrupted check can be found and continued.
+  console.log(`@@dir ${path.basename(outDir)}`);
   if (only) {
     await rm(path.join(outDir, only), { recursive: true, force: true });
     await rm(path.join(outDir, `${only}.webm`), { force: true });
-  } else {
-    // How this check was started, so one of its screens can be checked again later.
-    await writeFile(path.join(outDir, "run.json"), JSON.stringify({ argv }, null, 2), "utf8");
+  } else if (!resume) {
+    // How this check was started, so one of its screens can be checked again later, or the whole check continued.
+    const info: RunInfo = {
+      argv,
+      startedAt: started.getTime(),
+      name: playable.name,
+      total: ai ? undefined : devices.length * orientations.length + progress.extra,
+    };
+    await writeFile(path.join(outDir, "run.json"), JSON.stringify(info, null, 2), "utf8");
   }
+  const saved = resume ? await savedResults(outDir) : new Map<string, DeviceRun>();
+  /** Writes a finished screen's result next to its pictures: what a continued check picks up. */
+  const keep = async (result: DeviceRun): Promise<void> => {
+    if (only) {
+      return;
+    }
+    await mkdir(path.join(outDir, result.id), { recursive: true });
+    await writeFile(path.join(outDir, result.id, RESULT_FILE), JSON.stringify(result), "utf8");
+  };
   const screenId = (device: DeviceProfile, orientation: Orientation, job: { scenario?: string; language?: string; old?: string } = {}): string =>
     `${device.id}-${orientation}${job.scenario ? `-${job.scenario}` : ""}${job.language ? `-lang-${job.language}` : ""}${job.old ? `-old-${job.old}` : ""}`;
   const wanted = (device: DeviceProfile, orientation: Orientation, job: { scenario?: string; language?: string; old?: string } = {}): boolean =>
-    !only || screenId(device, orientation, job) === only;
+    only ? screenId(device, orientation, job) === only : !saved.has(screenId(device, orientation, job));
+  if (resume) {
+    // What a screen left half done is checked from the start.
+    for (const name of await readdir(outDir)) {
+      const id = name.endsWith(".webm") ? name.slice(0, -5) : name;
+      if (!saved.has(id) && (name.endsWith(".webm") || statSync(path.join(outDir, name)).isDirectory())) {
+        await rm(path.join(outDir, name), { recursive: true, force: true });
+      }
+    }
+    console.log(`Continued ${saved.size} screens done before, the rest are checked now`);
+  }
   const videoDir = flag("--no-video")
     ? undefined
     : await mkdtemp(path.join(os.tmpdir(), "playable-lab-video-"));
@@ -1849,6 +2161,9 @@ const main = async (): Promise<number> => {
   if (!only) {
     reportPlan(devices, orientations, scenarios, languages, ai ? [] : oldProfiles);
   }
+  for (const result of saved.values()) {
+    reportScreen(result);
+  }
   const languageRuns: DeviceRun[] = [];
   const oldRuns: DeviceRun[] = [];
   try {
@@ -1856,20 +2171,29 @@ const main = async (): Promise<number> => {
       runs.push(...(await runAutoplay(run, devices, orientations)));
     } else {
       progress.total = only ? 1 : devices.length * orientations.length + progress.extra;
+      progress.done = saved.size;
       reportProgress();
       // Screens run a few at a time: each has its own browser tab and its own clock.
       for (let o = 0; o < orientations.length; o += 1) {
         useTraceFor(orientations[o]);
-        const screens = devices.filter((device) => wanted(device, orientations[o]));
-        const done: DeviceRun[] = [];
-        await pool(screens, SCREENS_AT_ONCE, async (device) => {
+        const screens = devices.filter((device) => wanted(device, orientations[o]) || saved.has(screenId(device, orientations[o])));
+        const done: DeviceRun[] = screens.flatMap((device) => saved.get(screenId(device, orientations[o])) || []);
+        const one = async (device: DeviceProfile): Promise<void> => {
           const result = await runDevice(run, device, orientations[o]);
+          await keep(result);
           done.push(result);
           progress.done += 1;
           reportProgress();
           reportScreen(result);
           printChecks(`${result.device.name} · ${result.orientation} · ${result.cssWidth}×${result.cssHeight}`, result.status, result.checks);
-        });
+        };
+        // The recording phone goes first: the other screens place their touches by what it showed.
+        const todo = screens.filter((device) => wanted(device, orientations[o]));
+        const first = todo.find((device) => device.id === OWN_PHONE);
+        if (first) {
+          await one(first);
+        }
+        await pool(todo.filter((device) => device !== first), SCREENS_AT_ONCE, one);
         // The report keeps the screens in their usual order.
         runs.push(...screens.map((device) => done.find((item) => item.device.id === device.id)!).filter(Boolean));
       }
@@ -1885,11 +2209,12 @@ const main = async (): Promise<number> => {
       });
       languageRuns.sort((a, b) => languages.indexOf(a.language!) - languages.indexOf(b.language!));
       // Checked again on its own: compared with the other languages of the report it belongs to.
+      // Continued: compared with the languages done before the interruption.
       const previousLanguages: DeviceRun[] = only
         ? ((JSON.parse(await readFile(path.join(outDir, "report.json"), "utf8")) as RunReport).languages || []).filter(
             (item) => item.id !== only
           )
-        : [];
+        : languages.flatMap((language) => saved.get(screenId(narrow, orientations[0], { language })) || []);
       const allLanguages = [...previousLanguages, ...languageRuns];
       const english = allLanguages.find((item) => item.language === "en");
       const verdicts = languageChecks(
@@ -1903,6 +2228,7 @@ const main = async (): Promise<number> => {
           result.checks.push(verdict);
         }
         result.status = overallStatus(result.checks);
+        await keep(result);
         if (!languageRuns.includes(result)) {
           languageRuns.push(result);
           continue;
@@ -1910,6 +2236,7 @@ const main = async (): Promise<number> => {
         reportScreen(result);
         printChecks(`${result.device.name} · ${LANGUAGE_NAMES[result.language!] || result.language}`, result.status, result.checks);
       }
+      languageRuns.sort((a, b) => languages.indexOf(a.language!) - languages.indexOf(b.language!));
     }
     if (oldProfiles.length > 0 && !ai) {
       const catalog = devicesById();
@@ -1918,6 +2245,12 @@ const main = async (): Promise<number> => {
       const sources = run.sources && run.sources.length > 0 ? run.sources : extractScripts(playable.html || "");
       const hasWebp = /data:image\/webp|\.webp\b/i.test(playable.html || "") || Boolean(playable.bundle?.sizes && Object.keys(playable.bundle.sizes).some((name) => name.endsWith(".webp")));
       const found = await scanFeatures(sources, hasWebp);
+      oldRuns.push(
+        ...oldProfiles.flatMap((profile) => {
+          const phone = catalog.get(profile.device);
+          return (phone && saved.get(screenId(phone, orientations[0], { old: profile.id }))) || [];
+        })
+      );
       await pool(
         oldProfiles.filter((profile) => {
           const phone = catalog.get(profile.device);
@@ -1929,6 +2262,7 @@ const main = async (): Promise<number> => {
           const result = await runDevice(run, phone, orientations[0], { old: profile });
           result.checks = [oldPhoneCheck(profile, result.checks), oldCodeCheck(profile, found), ...result.checks];
           result.status = overallStatus(result.checks.slice(0, 2));
+          await keep(result);
           oldRuns.push(result);
           progress.done += 1;
           reportProgress();
@@ -1943,7 +2277,9 @@ const main = async (): Promise<number> => {
         devices.find((device) => device.id === "pixel-7") ||
         devices.find((device) => device.os === "android" && device.group !== "tablet") ||
         devices[0];
-      const announce = (result: DeviceRun): void => {
+      stress.push(...scenarios.flatMap((scenario) => saved.get(screenId(phone, orientations[0], { scenario })) || []));
+      const announce = async (result: DeviceRun): Promise<void> => {
+        await keep(result);
         stress.push(result);
         progress.done += 1;
         reportProgress();
@@ -1952,7 +2288,7 @@ const main = async (): Promise<number> => {
       };
       useTraceFor(orientations[0]);
       await pool(scenarios.filter((scenario) => wanted(phone, orientations[0], { scenario })), 3, async (scenario) => {
-        announce(await runDevice(run, phone, orientations[0], { scenario }));
+        await announce(await runDevice(run, phone, orientations[0], { scenario }));
       });
       stress.sort((a, b) => SCENARIOS.indexOf(a.scenario as Scenario) - SCENARIOS.indexOf(b.scenario as Scenario));
     }
@@ -2102,6 +2438,34 @@ const oldPhoneCheck = (profile: OldProfile, checks: CheckResult[]): CheckResult 
     return { ...base, status: "warn", message: `As on ${profile.name}, it played but wrote errors.`, details: errors.details?.slice(0, 4) };
   }
   return { ...base, status: "pass", message: `As on ${profile.name}, it loaded and played without errors.` };
+};
+
+/** How a check was started, in its report folder: to check one screen again, or to continue it. */
+interface RunInfo {
+  argv: string[];
+  startedAt?: number;
+  name?: string;
+  /** Screens planned; none for an AI check. */
+  total?: number;
+}
+
+/** A finished screen's result, next to its pictures, while the check goes on. */
+const RESULT_FILE = "result.json";
+
+/** The screens an interrupted check finished. */
+const savedResults = async (outDir: string): Promise<Map<string, DeviceRun>> => {
+  const saved = new Map<string, DeviceRun>();
+  for (const name of await readdir(outDir)) {
+    try {
+      const result = JSON.parse(await readFile(path.join(outDir, name, RESULT_FILE), "utf8")) as DeviceRun;
+      if (result.id === name) {
+        saved.set(name, result);
+      }
+    } catch {
+      // Not a screen, or not finished.
+    }
+  }
+  return saved;
 };
 
 /**

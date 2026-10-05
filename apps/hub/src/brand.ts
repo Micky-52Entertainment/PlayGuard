@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 /** The PlayGuard logo, small, inside the page: the pages the hub writes are sent on as single files. */
 export const LOGO_URI = (() => {
   try {
-    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+    const root = process.env.PLAYGUARD_ROOT ? path.resolve(process.env.PLAYGUARD_ROOT) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
     return `data:image/png;base64,${readFileSync(path.join(root, "apps/lab-console/public/favicon.png")).toString("base64")}`;
   } catch {
     return "";

@@ -14,3 +14,8 @@ batches/
 # Video production: local Python env and voice model
 video/.venv/
 video/models/
+
+# Desktop app: build output, bundled browsers
+apps/desktop/stage/
+apps/desktop/browsers/
+apps/desktop/release/
