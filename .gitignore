@@ -8,12 +8,13 @@ reports/
 playables/**
 !playables/.gitkeep
 *.log
+.env
+.env.*
 batches/
 .playable-lab/
 
-# Video production: local Python env and voice model
-video/.venv/
-video/models/
+# Promo video production: kept locally, not in the repo
+video/
 
 # Desktop app: build output, bundled browsers
 apps/desktop/stage/

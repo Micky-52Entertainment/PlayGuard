@@ -215,11 +215,14 @@ If something does not work, the **Help** section in PlayGuard covers the usual q
 | `apps/desktop` | The installed app for macOS and Windows: runs the hub in its own window, installers and updates |
 | `apps/playwright-runner` | Replays the playthrough on every screen in a real browser, runs the checks and the AI, writes the report |
 | `apps/mobile` | Optional scanner app for the phone (the regular camera is enough) |
-| `samples/demo` | Demo playable and builds for a first try |
 | `packages/*` | Shared parts: the device list, network rules, checks, recording, mapping touches to each screen size |
-| `traces/` | Recorded playthroughs |
-| `reports/` | Finished reports |
-| `batches/` | Uploaded archives of builds |
+| `samples/` | Demo playable and builds for a first try, plus the built-in sample playable |
+| `docs/` | Install guide, technical details, how to release, README screenshots |
+| `scripts/` | `npm start` launcher and the README screenshot script |
+| `tests/` | End-to-end test of the console |
+| `plugins/` | Reserved slots for future plugins |
+
+Created at run time and not stored in git: `traces/` (recorded playthroughs), `reports/` (finished reports), `playables/` (uploaded files) and `batches/` (uploaded archives of builds).
 
 What changed from version to version is in [CHANGELOG.md](CHANGELOG.md). Found a bug or have an idea? Open an issue on GitHub (Issues → New issue); the templates are ready.
 

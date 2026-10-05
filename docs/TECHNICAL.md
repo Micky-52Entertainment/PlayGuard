@@ -4,8 +4,6 @@ Lab for playable ads: one recorded gameplay on a phone, remapped onto many
 screen sizes, then replayed with Playwright. Works with Luna Playworks,
 Cocos Creator web-mobile, and clear JS / vanilla HTML5.
 
-Previous Audit Pro iframes live in `../legacy/audit-pro/`.
-
 ## How a session runs
 
 1. Operator picks a **test chain step**. Each step is one group and **one**
