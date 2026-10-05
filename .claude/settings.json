@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(**/node_modules/**)",
+      "Read(**/dist/**)",
+      "Read(./build/**)",
+      "Read(./apps/desktop/stage/**)",
+      "Read(./apps/desktop/browsers/**)",
+      "Read(./apps/desktop/release/**)",
+      "Read(./reports/**)",
+      "Read(./batches/**)",
+      "Read(./playables/**)",
+      "Read(./traces/**)",
+      "Read(./.playable-lab/**)",
+      "Read(./video/**)",
+      "Read(**/package-lock.json)",
+      "Read(./samples/demo/demo-builds.zip)",
+      "Read(./apps/lab-console/public/mascot/**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)"
+    ]
+  }
+}
